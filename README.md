@@ -30,7 +30,7 @@ Blocks contain this informs:
 2. Generate unique data fingerprint:the hash
 3. One-way & Deterministic
    - When you interpret same series of bytes, you will always get same hash. 
-     However, you cannot get a series of bytes from hash.
+     However, you cannot get the series of bytes from the hash.
 
 In a nutshell, a hash algorithm consists of a set of irreversible computations 
 that can be performed on a datum to generate a (usually) unique byte sequence.
@@ -87,6 +87,16 @@ as any change in the block data will result in a different hash.
    and the nonce is the key to that puzzle. The process of finding that key is called mining.
 
 ## 2. mining
+Generating the correct hash for a block is like the puzzle,
+and the nonce is the key to that puzzle. The process of finding that key is called mining.
+### Mining Strategy
+1. Generate new nonce
+2. Hash bytes(this is the computationally heavy step)
+3. Check hash against difficulty
+   1. Insufficient? Go back to step 1
+   2. Sufficient? Continue to step 4
+4. Add block to chain
+5. Submit to peers, etc.
 
 ## 3. transactions
 
