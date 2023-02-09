@@ -152,6 +152,7 @@ The verification process는 다음 네가지 사항을 확인해야 한다.
 
 이 프로세스는 블록체인의 무결성을 유지하고 변조 또는 사기를 방지하는 데 중요하다.
 
+
 ## 3. transactions
 
 ## 4. smart contracts
