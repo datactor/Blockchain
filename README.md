@@ -1,7 +1,7 @@
 # Generic blockchain(with pow)
 Blockchain = chronological, sequential list of blocks
 
-### Why Rust?
+## Why Rust?
 
 - Interoperable with C/C++
 - smart compiler
@@ -22,6 +22,16 @@ Blocks contain this informs:
 - Hash: cryptographic fingerprint of all of the above data concatenated together
 
 ### Hashing? Generate digital fingerprint
+
+In a nutshell, a hash algorithm consists of a set of irreversible computations
+that can be performed on a datum to generate a (usually) unique byte sequence.
+In a blockchain, each block contains a set of transactions and
+a reference to the previous block's hash. The current block's hash is calculated by
+applying the hash function to the combination of the block's transactions and
+the previous block's hash. This creates a chain of hashes that is resistant to tampering,
+as any change in the block data will result in a different hash.
+`SHA2`, `SHA3(Keccak-256)`
+
 1. Concatenate together all the bytes composing the block's fields
    (aside from the hash field) 
    - In the early days, hashcash algorithm(SHA-256^2) was used,
@@ -32,14 +42,6 @@ Blocks contain this informs:
    - When you interpret same series of bytes, you will always get same hash. 
      However, you cannot get the series of bytes from the hash.
 
-In a nutshell, a hash algorithm consists of a set of irreversible computations 
-that can be performed on a datum to generate a (usually) unique byte sequence.
-In a blockchain, each block contains a set of transactions and
-a reference to the previous block's hash. The current block's hash is calculated by
-applying the hash function to the combination of the block's transactions and
-the previous block's hash. This creates a chain of hashes that is resistant to tampering,
-as any change in the block data will result in a different hash.
-`SHA2`, `SHA3(Keccak-256)`
 
 4. Difficulty?
    
@@ -111,7 +113,7 @@ and the nonce is the key to that puzzle. The process of finding that key is call
 앞에서도 강조한 것처럼 block header의 hash는 비가역성을 가졌기 때문에
 역으로 찾을 수 없어 O(n)의 brute force 탐색을 해야 한다.
 
-#### Reveiew: Mining
+### Reveiew: Mining
 A block having been "mined" means that an amount of effort has been put into discovering
 a nonce "key" that "unlocks" the block's hash-based "puzzle".
 
@@ -122,9 +124,9 @@ miners on the network to maintain the average time it takes to mine a block.
 
 Bitcoin adjusts its difficulty every 2,016 blocks such that the next 2,016 blocks should take two weeks to mine.
 
-#### Blcok Verification
+### Blcok Verification
 
-##### Blockchain?
+#### Blockchain?
 
 when we store blocks in memory, we use a plain old vector (resizable array). This is a blockchain
 (A non-decreasing, one-way, push-only Vector),
@@ -168,7 +170,7 @@ The verification process는 다음 네가지 사항을 확인해야 한다.
 
 ## 3. transactions
 
-### Transaction Verification REquirements
+### Transaction Verification Requirements
 
 https://en.bitcoin.it/wiki/Protocol_rules#.22tx.22_messages
 
@@ -183,7 +185,7 @@ This meaning everyone has a copy.
 
 `ledger`? like the history of transactions that have occurred in our cryptocurrency network. 
 
-##### Structure of a Transaction
+#### Structure of a Transaction
 Inputs & Outputs? Inputs are Outputs.
 
 Input = A reference to a previous transaction output, known as UTXO(unspent transaction output)
@@ -220,7 +222,7 @@ Transaction update example:
 8. And each node's copy of the ledger is updated to reflect this consensus.
 
 
-##### Relationship between transaction and mining (verifying)
+#### Relationship between transaction and mining (verifying)
 
 In Bitcoin, mining is the process of verifying transactions and adding them to the blockchain as blocks.
 Miners compete with each other to verify a set of transactions and add them to the blockchain,
@@ -228,8 +230,8 @@ and the miner who succeeds first is awarded a block reward in the form of newly 
 If there are no transactions to verify, there would be nothing for the miners to add to the blockchain,
 so they wouldn't be able to mine.
 
-#### solution
-Bitcoin transac*t*ions ensure integrity from the following topics by using cryptographic methods:
+#### Problems and their Solutions
+Bitcoin transactions ensure integrity from the following topics by using cryptographic methods:
 
 1. Overspending: Bitcoin uses a transaction ledger called the blockchain to keep track of all transactions.
    The blockchain is a public ledger that is maintained by all nodes in the network,
@@ -248,29 +250,28 @@ Bitcoin transac*t*ions ensure integrity from the following topics by using crypt
    The sender's public key is used to encrypt the transaction, and the private key is used to decrypt it.
    This ensures that the transaction is initiated by the owner of the wallet and not by an impersonator.
 
-#### Additional problems and their solutions
 
-1. Scalability: The increasing number of transactions on the blockchain can lead to scalability issues such as
+4. Scalability: The increasing number of transactions on the blockchain can lead to scalability issues such as
    slow transaction processing times and high fees. Solutions to this problem include off-chain transactions,
    sharding, and lightning networks.
 
 
-2. Centralization: As mining becomes more difficult, the number of miners participating in the network decreases,
+5. Centralization: As mining becomes more difficult, the number of miners participating in the network decreases,
    leading to centralization of the network. Solutions to this problem include using consensus algorithms that
    are less energy-intensive, such as Proof of Stake, and encouraging more miners to participate in the network.
 
 
-3. Interoperability: Different blockchains use different protocols, making it difficult for them
+6. Interoperability: Different blockchains use different protocols, making it difficult for them
    to interact with each other. Solutions to this problem include cross-chain bridges and atomic swaps,
    which allow for the exchange of assets between different blockchains.
 
 
-4. Privacy: Blockchains are designed to be transparent, but this transparency can put users' privacy at risk.
+7. Privacy: Blockchains are designed to be transparent, but this transparency can put users' privacy at risk.
    Solutions to this problem include using privacy-enhancing technologies like zero-knowledge proofs and
    ring signatures, which allow users to conduct transactions while maintaining their anonymity.
 
 
-5. Security: Blockchains can be vulnerable to attacks, such as 51% attacks,
+8. Security: Blockchains can be vulnerable to attacks, such as 51% attacks,
    where a group of miners control more than half of the network's computational power and can manipulate the blockchain.
    Solutions to this problem include using consensus algorithms that are less vulnerable to 51% attacks,
    such as Proof of Stake, and implementing better security measures to protect the network.
