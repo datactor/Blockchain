@@ -123,6 +123,19 @@ miners on the network to maintain the average time it takes to mine a block.
 Bitcoin adjusts its difficulty every 2,016 blocks such that the next 2,016 blocks should take two weeks to mine.
 
 #### Blcok Verification
+
+##### Blockchain?
+
+when we store blocks in memory, we use a plain old vector (resizable array). This is a blockchain
+(A non-decreasing, one-way, push-only Vector),
+and if it’s actually being used in real life, we’ll receive new blocks from other people: other untrusted people.
+We need to make sure they’re being honest, conforming to the protocol.
+
+We aren’t able to validate the information stored in blocks yet — as of now, it’s just arbitrary string data — 
+but we can make sure that the blocks themselves look all right. Remember that mining a block is like
+finding a key to a lock or a solution to a puzzle. The solution is difficult to come by, but once you know it,
+it’s easy to make sure it’s correct.
+
 Given the implementation we have so far, we can also implement a few rudimentary block verification tests.
 These steps would be executed whenever we receive a new block from a peer.
 
@@ -142,10 +155,10 @@ The verification process는 다음 네가지 사항을 확인해야 한다.
 1. block의 index가 예상 값과 일치(Bitcoin의 block은 index를 저장하지 않음)
    - 비트코인의 경우 index를 저장하지 않지만, chain에서 존재하는 블록 수를 세어 index를 셀 수 있다.
    - 비트코인은 총유통량이 2100만개로 정해져 있기 때문에 block의 수를 세는데 많은 리소스가 들지 않는다.
-   - 반면에 다른 코인들은 유통량이 정해져있지 않고 무한정 증가할 수 있는 코인도 있기 때문에 무결성 검사 마다 일일히 세는 것 보단 
-     추가 저장공간을 차지하더라도 index를 저장해 놓는 것이 효율적일 수 있음. 
-   - 코인마다 디자인 선택은 효율성과 보안 간의 절충, 그리고 의도된 사용 사례, 원하는 탈중앙화 수준, 
-     사용 가능한 계산 리소스도 이 결정에 중요한 역할을 함.
+   - 반면에 유통량이 정해져있지 않고 무한정 증가할 수 있는 코인들도 있기 때문에 무결성 검사 마다 일일히 세는 것 보단 
+     추가 저장공간을 차지하더라도 index를 저장해 놓는 것이 효율적일 수 있다. 
+   - 뿐만 아니라 코인마다 디자인 선택은 효율성과 보안 간의 절충, 그리고 의도된 사용 사례, 원하는 탈중앙화 수준, 
+     사용 가능한 계산 리소스도 이 결정에 중요한 역할을 한다.
 2. block의 hash는 특정 난이도를 충족
 3. block의 timestamp는 항상 이전 블록의 timestamp보다 커야함.
 4. prev. block의 hash는 chain의 첫 번째 블록(genesis block)을 제외하고 예상 값과 일치

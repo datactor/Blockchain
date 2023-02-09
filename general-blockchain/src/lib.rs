@@ -2,9 +2,12 @@ use chrono::prelude::*;
 
 mod block;
 mod hashable;
+mod blockchain;
+
 pub use crate::{ // Leave main.rs compact. mods loaded into lib.rs from elsewhere can be used in main.rs without specifying them in main.rs
     block::Block,
     hashable::Hashable,
+    blockchain::Blockchain,
 };
 
 type BlockHash = Vec<u8>;
