@@ -180,12 +180,12 @@ We have to protect against:
 - Impersonation(Who owns the money and who is sending it?)
 - ...(there are more, but we're just going to cover these three today)
 
-#### The Blockchain as a "Distributed ledger"
+### The Blockchain as a "Distributed ledger"
 This meaning everyone has a copy.
 
 `ledger`? like the history of transactions that have occurred in our cryptocurrency network. 
 
-#### Structure of a Transaction
+### Structure of a Transaction
 Inputs & Outputs? Inputs are Outputs.
 
 Input = A reference to a previous transaction output, known as UTXO(unspent transaction output)
@@ -209,10 +209,56 @@ In summary, the relationship between inputs and outputs in a Bitcoin transaction
 previous transaction outputs (UTXOs) as a way of proving ownership and authorizing the spending of funds,
 while outputs define the recipient addresses and the amounts being sent to those addresses.
 
+### Regular Transactions
 
-Transaction update example:
+For us right now, transactions only contain two important pieces of information:
+- Set of inputs(which are unused outputs from previous transactions(UTXO))
+- Set of outputs(new outputs that can be used in future transactions)
+
+From here we can caculate :
+- the value of the transaction: Σinputs
+- the value of the fee: Σinputs - Σoutputs
+
+#### Mining rewards? fixed income(block rewards) + fee
+Mining serves the purpose of verifying transactions and adding them to the blockchain.
+For performing this function, miners receive a reward, which is composed of two parts:
+a block reward and transaction fees.
+
+The block reward is a fixed amount of newly minted bitcoins that are
+awarded to the miner who successfully adds a block to the blockchain.
+This reward is designed to incentivize miners to participate in the network and to secure the blockchain.
+Currently, the block reward is 6.25 bitcoins.
+
+Transaction fees are optional payments made by the users of the network to prioritize the processing of their transactions.
+When a user sends a transaction, they have the option of including a fee to incentivize miners to include
+their transaction in the next block they mine. Miners will generally prioritize transactions with higher fees
+as they want to maximize their profits.
+
+So to summarize, mining compensation in Bitcoin is not just a transaction fee,
+but it is a combination of a block reward and transaction fees. The block reward is a fixed amount,
+while the transaction fees can vary based on the users' choices and the current demand for block space.
+
+#### Transaction update example:
 
 1. Send bitcoins from wallet A to wallet B.
+   - UTXO를 Input으로 wallet A의 Output, B의 Output을 생성
+   - Output을 생성할때는 script를 사용한다. 사용되는 script는 P2PKH(pay-to-public-key-hash) script로, transact하는 사람이 특정
+     값으로 해시되는 public key와 private key를 사용해 생성된 digital signature를 제공해서 Output을 생성한다.
+   - 결국에는 input도 key와 corresponding해서 script로 만들어졌던 Output이기 때문에 signature가 그대로 남아있으며,
+     자금의 ownership을 증명하고 전송을 승인하는데 사용된다. signature는 어떤 방식으로도 변경되지 않는다.
+     input이 소비되면 참조하는 이전 Output에 대한 정보와 signature를 사용해 자금을 사용하는 사람이 실제로 정당한 소유자인지 확인한다.
+     이 확인이 완료되면 input이 사용된 것으로 간주되고 해당 금액이 수취인의 주소로 이체된다.
+   - input이 소비되면 이전 출력에 대한 정보는 네트워크 기능에 더 이상 필요하지 않기 때문에 이체를 승인하는데 사용되는 특정 input에 대한
+     직접 엑세스는 불가능해진다.
+   - 그러나 transaction 자체는 자금 이체에 대한 영구 기록으로 blockchain에 남아있다. 그렇지만 액세스할 수는 없다.
+     (거래내역이 공개되고 투명하기 때문에 소비된 input에 대한 정보 자체는 여전히 blockchain에 남아 있다!!)
+   - Genesis Block의 경우에는 Input을 어떻게 생성할까? genesis block의 input은 생성될 당시 이전 transaction이 없었기 때문에
+     참조할 이전 출력이나 확인할 서명이 없다. 여기에 포함된 자금은 "created out of thin air"로 간주되며 네트워크의 일반 거래와 동일한 규칙
+     및 제한이 적용되지 않는다. 제네시스 블록을 생성한 사람은 자금의 정당한 소유자로 간주되며 일반적으로 블록을 생성한 채굴자에게 보상하는 데 사용된다.
+     제네시스 블록의 소유자는 정당한 소유자이기 때문에 transaction 확인을 위한 서명(input 서명)이 필요하지 않으며 존재하지도 않는다(output은 당연히 필요함).
+     
+     
+     
 2. The transaction is broadcast to the Bitcoin network.
 3. It is verified and processed by nodes (also known as validators or miners) in the network.
 4. Each node updates its copy of the ledger to reflect the new transaction.
@@ -222,7 +268,7 @@ Transaction update example:
 8. And each node's copy of the ledger is updated to reflect this consensus.
 
 
-#### Relationship between transaction and mining (verifying)
+#### Relationship between transaction and mining(verifying)
 
 In Bitcoin, mining is the process of verifying transactions and adding them to the blockchain as blocks.
 Miners compete with each other to verify a set of transactions and add them to the blockchain,
