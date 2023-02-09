@@ -2,12 +2,13 @@ use std::fmt::{ self, Debug, Formatter };
 use super::*;
 
 pub struct Block {
-    pub index: u32, // where does this line in the blockchain
+    pub index: u32, // Bitcoin doesn't have an index field, so instead it contains a field representing the version of the block: 'version: [u8, 32],'
     pub timestamp: u128,
     pub hash: BlockHash,
     pub prev_block_hash: BlockHash,
+    // pub merkle_root: [u8: 32],
     pub nonce: u64,
-    pub payload: String,
+    pub payload: String, // for Bitcoin this field is 'transaction: Vec<Transaction>,'
     pub difficulty: u128,
 }
 

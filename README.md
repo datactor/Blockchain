@@ -1,4 +1,4 @@
-# Generic blockchain(with PoW)
+# Generic blockchain(with pow)
 Blockchain = chronological, sequential list of blocks
 
 ### Why Rust?
@@ -167,5 +167,112 @@ The verification process는 다음 네가지 사항을 확인해야 한다.
 
 
 ## 3. transactions
+
+### Transaction Verification REquirements
+
+https://en.bitcoin.it/wiki/Protocol_rules#.22tx.22_messages
+
+We have to protect against:
+- Overspending(Where did the money come from?)
+- Double-spending(Is the money available?)
+- Impersonation(Who owns the money and who is sending it?)
+- ...(there are more, but we're just going to cover these three today)
+
+#### The Blockchain as a "Distributed ledger"
+This meaning everyone has a copy.
+
+`ledger`? like the history of transactions that have occurred in our cryptocurrency network. 
+
+##### Structure of a Transaction
+Inputs & Outputs? Inputs are Outputs.
+
+Input = A reference to a previous transaction output, known as UTXO(unspent transaction output)
+
+Inputs being references to previous transactions and Outputs being the recipient addresses and
+the amounts being sent to those addresses(Returns to the sender if the transaction fails with the recipient address.
+Therefore, the output is at least two).
+
+The input specifies the transaction id and the index of the UTXO it is referring to,
+along with the digital signature from the owner of the UTXO to prove ownership and authorize the spending of the funds.
+
+One transaction can have multiple inputs, each referring to a different UTXO,
+but the total value of the inputs must be equal to or greater than the value of the outputs.
+Any difference between the inputs and outputs represents the transaction fee,
+which is a reward for the miner who includes the transaction in a block.
+
+The outputs of a transaction define the recipient addresses and the amounts being sent to those addresses.
+There can be multiple outputs in a single transaction, allowing the sender to send funds to multiple recipients in a single transaction.
+
+In summary, the relationship between inputs and outputs in a Bitcoin transaction is that inputs refer to
+previous transaction outputs (UTXOs) as a way of proving ownership and authorizing the spending of funds,
+while outputs define the recipient addresses and the amounts being sent to those addresses.
+
+
+Transaction update example:
+
+1. Send bitcoins from wallet A to wallet B.
+2. The transaction is broadcast to the Bitcoin network.
+3. It is verified and processed by nodes (also known as validators or miners) in the network.
+4. Each node updates its copy of the ledger to reflect the new transaction.
+5. And this updated ledger is then propagated to other nodes in the network.
+6. Over time, the updated ledger becomes the consensus ledger, which is agreed upon by a majority of the nodes in the network.
+7. This consensus ledger forms the basis of the distributed ledger.
+8. And each node's copy of the ledger is updated to reflect this consensus.
+
+
+##### Relationship between transaction and mining (verifying)
+
+In Bitcoin, mining is the process of verifying transactions and adding them to the blockchain as blocks.
+Miners compete with each other to verify a set of transactions and add them to the blockchain,
+and the miner who succeeds first is awarded a block reward in the form of newly minted bitcoins.
+If there are no transactions to verify, there would be nothing for the miners to add to the blockchain,
+so they wouldn't be able to mine.
+
+#### solution
+Bitcoin transac*t*ions ensure integrity from the following topics by using cryptographic methods:
+
+1. Overspending: Bitcoin uses a transaction ledger called the blockchain to keep track of all transactions.
+   The blockchain is a public ledger that is maintained by all nodes in the network,
+   and each transaction is verified by the network to ensure that
+   the amount being spent is not greater than the amount available in the sender's wallet.
+
+
+2. Double-spending: Bitcoin uses a mechanism called the "Confirmation" process to prevent double-spending.
+   This process involves adding the transaction to the blockchain,
+   which takes a certain amount of time (typically 10 minutes). During this time,
+   other nodes in the network will verify the transaction, and if the same coins are spent again,
+   the network will reject the transaction.
+
+
+3. Impersonation: Bitcoin uses digital signatures to verify the identity of the sender and prevent impersonation.
+   The sender's public key is used to encrypt the transaction, and the private key is used to decrypt it.
+   This ensures that the transaction is initiated by the owner of the wallet and not by an impersonator.
+
+#### Additional problems and their solutions
+
+1. Scalability: The increasing number of transactions on the blockchain can lead to scalability issues such as
+   slow transaction processing times and high fees. Solutions to this problem include off-chain transactions,
+   sharding, and lightning networks.
+
+
+2. Centralization: As mining becomes more difficult, the number of miners participating in the network decreases,
+   leading to centralization of the network. Solutions to this problem include using consensus algorithms that
+   are less energy-intensive, such as Proof of Stake, and encouraging more miners to participate in the network.
+
+
+3. Interoperability: Different blockchains use different protocols, making it difficult for them
+   to interact with each other. Solutions to this problem include cross-chain bridges and atomic swaps,
+   which allow for the exchange of assets between different blockchains.
+
+
+4. Privacy: Blockchains are designed to be transparent, but this transparency can put users' privacy at risk.
+   Solutions to this problem include using privacy-enhancing technologies like zero-knowledge proofs and
+   ring signatures, which allow users to conduct transactions while maintaining their anonymity.
+
+
+5. Security: Blockchains can be vulnerable to attacks, such as 51% attacks,
+   where a group of miners control more than half of the network's computational power and can manipulate the blockchain.
+   Solutions to this problem include using consensus algorithms that are less vulnerable to 51% attacks,
+   such as Proof of Stake, and implementing better security measures to protect the network.
 
 ## 4. smart contracts
