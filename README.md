@@ -219,7 +219,7 @@ From here we can caculate :
 - the value of the transaction: Σinputs
 - the value of the fee: Σinputs - Σoutputs
 
-#### Mining rewards? fixed income(block rewards) + fee
+#### Mining rewards? fee + fixed income(block rewards)
 Mining serves the purpose of verifying transactions and adding them to the blockchain.
 For performing this function, miners receive a reward, which is composed of two parts:
 a block reward and transaction fees.
@@ -238,11 +238,20 @@ So to summarize, mining compensation in Bitcoin is not just a transaction fee,
 but it is a combination of a block reward and transaction fees. The block reward is a fixed amount,
 while the transaction fees can vary based on the users' choices and the current demand for block space.
 
-#### Transaction update example:
+### Coinbase Transactions(genesis block)
+Where it all starts(created out of thin air)
+
+Coinbase transactions :
+- do not require inputs
+- produce an output
+- allow the miner to collect all the transaction fees in that block and that block's block reward(coin genesis);
+
+
+### Transaction update example:
 
 1. Send bitcoins from wallet A to wallet B.
    - UTXO를 Input으로 wallet A의 Output, B의 Output을 생성
-   - Output을 생성할때는 script를 사용한다. 사용되는 script는 P2PKH(pay-to-public-key-hash) script로, transact하는 사람이 특정
+   - Output을 생성할때는 script를 사용한다. 사용되는 script는 `P2PKH(pay-to-public-key-hash)` script로, transact하는 사람이 특정
      값으로 해시되는 public key와 private key를 사용해 생성된 digital signature를 제공해서 Output을 생성한다.
    - 결국에는 input도 key와 corresponding해서 script로 만들어졌던 Output이기 때문에 signature가 그대로 남아있으며,
      자금의 ownership을 증명하고 전송을 승인하는데 사용된다. signature는 어떤 방식으로도 변경되지 않는다.
@@ -251,14 +260,14 @@ while the transaction fees can vary based on the users' choices and the current 
    - input이 소비되면 이전 출력에 대한 정보는 네트워크 기능에 더 이상 필요하지 않기 때문에 이체를 승인하는데 사용되는 특정 input에 대한
      직접 엑세스는 불가능해진다.
    - 그러나 transaction 자체는 자금 이체에 대한 영구 기록으로 blockchain에 남아있다. 그렇지만 액세스할 수는 없다.
-     (거래내역이 공개되고 투명하기 때문에 소비된 input에 대한 정보 자체는 여전히 blockchain에 남아 있다!!)
+     (거래내역이 공개되고 투명하기 때문에 소비된 input에 대한 정보 자체는 여전히 blockchain에 존재한다는 점은 주목할 가치가 있다!)
    - Genesis Block의 경우에는 Input을 어떻게 생성할까? genesis block의 input은 생성될 당시 이전 transaction이 없었기 때문에
      참조할 이전 출력이나 확인할 서명이 없다. 여기에 포함된 자금은 "created out of thin air"로 간주되며 네트워크의 일반 거래와 동일한 규칙
      및 제한이 적용되지 않는다. 제네시스 블록을 생성한 사람은 자금의 정당한 소유자로 간주되며 일반적으로 블록을 생성한 채굴자에게 보상하는 데 사용된다.
-     제네시스 블록의 소유자는 정당한 소유자이기 때문에 transaction 확인을 위한 서명(input 서명)이 필요하지 않으며 존재하지도 않는다(output은 당연히 필요함).
-     
-     
-     
+     제네시스 블록의 소유자는 정당한 소유자이기 때문에 transaction 확인을 위한 서명(input 서명)이 요구되지 않는다(output은 당연히 필요함).
+   - Genesis block의 Input에는 일반적으로 miner의 메시지와 같은 임의의 데이터와 일반 트랜잭션을 구별하기 위한 "coinbase" identifier가 포함된다.
+   - `Coinbase transaction`의 Input은 UTXO를 참조하는 일반적인 방법과 달리 node를 채굴하여 생성된 Block rewards를 참조한다.
+   
 2. The transaction is broadcast to the Bitcoin network.
 3. It is verified and processed by nodes (also known as validators or miners) in the network.
 4. Each node updates its copy of the ledger to reflect the new transaction.
@@ -276,25 +285,71 @@ and the miner who succeeds first is awarded a block reward in the form of newly 
 If there are no transactions to verify, there would be nothing for the miners to add to the blockchain,
 so they wouldn't be able to mine.
 
-#### Problems and their Solutions
+
+### Meeting Tx Verification Requirements(Problems and their Solutions)
+
+Bitcoin's consensus mechanism: Proof of Work (PoW)
+
 Bitcoin transactions ensure integrity from the following topics by using cryptographic methods:
 
 1. Overspending: Bitcoin uses a transaction ledger called the blockchain to keep track of all transactions.
    The blockchain is a public ledger that is maintained by all nodes in the network,
    and each transaction is verified by the network to ensure that
-   the amount being spent is not greater than the amount available in the sender's wallet.
+   `the amount being spent(Outputs) is not greater than the amount available(Inputs) in the sender's wallet.`
 
 
-2. Double-spending: Bitcoin uses a mechanism called the "Confirmation" process to prevent double-spending.
+2. Double-spending: Bitcoin uses a mechanism called the `Confirmation` process to prevent double-spending.
    This process involves adding the transaction to the blockchain,
    which takes a certain amount of time (typically 10 minutes). During this time,
    other nodes in the network will verify the transaction, and if the same coins are spent again,
    the network will reject the transaction.
-
+   `The "Confirmation" process prevents double-spending by adding only the most PoW mined blockchain to the network.`
+   \
+   \
+   In the case of two miners simultaneously solving the same block and generating two different candidate blocks,
+   the network chooses the block with the greatest proof-of-work (PoW) as the valid block.
+   This is because the PoW is a mechanism to ensure that adding a new block to the blockchain requires computational effort,
+   and the block with the greatest PoW represents the most effort put in. The other block is discarded.
+   This is the basic consensus mechanism for most public blockchains, including Bitcoin.
+   \
+   \
+   However, there may be a temporary situation where two blocks are
+   added to the blockchain at the same time and the network is split into two separate chains, this is called a `fork`.
+   In this case, the network will eventually decide which chain is the correct one and abandon the other chain.
+   This process is done through the consensus mechanism(PoW), where the longest chain with the most proof of work is
+   considered the authoritative chain.
+   \
+   \
+   In the context of a blockchain, each block contains multiple transactions and is considered
+   as a `Confirmation` once it is added to the blockchain and verified by the network. Typically, a transaction is
+   considered secure and final after 6 confirmations, but the exact number may vary depending on the network or use case.
+   - block을 blockchain에 추가하려면 난이도 목표가 hashing된 값을 nonce값을 바꿔 찾은(mining) 다음 block을 blockchain에 추가함.
+   - 즉, 안전하고 최종적인 blockchain으로 간주되기 위해서는 6명 이상의 채굴자와 경쟁해야함.
+   - PoW mechanism에서 blockchain의 node network는 most PoW와 most cumulative difficulty가 있는 chain을 선택한다.
+   - network는 선택되지 않은 나머지 blockchain은 폐기한다. 폐기된 blockchain은 `orphan` 또는 `stale` 블록으로 네트워크에 저장될 수 있지만,
+     Tx를 확인하거나 네트워크의 현재상태를 결정하는데 사용되지는 않는다.
+   - 그러나 이러한 block들도 network의 과거 이벤트에 대한 정보를 제공하고, 백업 역할을 하여 네트워크 보안 및 안정성에 도움을 줄 수 있으며,
+     새 node 또는 재결합 node에 대한 네트워크 동기화에 도움을 줄 수 있다. 또한 일부 블록체인 네트워크는 이러한 블록을 사용해 miner에 대한
+     보상 분배를 결정할 수 있으며 일부는 네트워크 기록을 보존하기 위해 향후 블록에 포함할 수 있다. 따라서 orphan or stale blocks들도
+     블록체인 시스템의 전체 기능 내에서 여전히 가치와 목적을 가지고 있다.
+   \
+   \
+   
+   Make sure that anyone output is never used as an input more than once.
+   This can be done by maintaining a pool of unsepent outputs and rejecting any transaction that
+   tries to spend outputs that don't exist in the pool.
+   
 
 3. Impersonation: Bitcoin uses digital signatures to verify the identity of the sender and prevent impersonation.
    The sender's public key is used to encrypt the transaction, and the private key is used to decrypt it.
    This ensures that the transaction is initiated by the owner of the wallet and not by an impersonator.
+   - How about Input's previous output signature?
+     The previous signature in the input of a transaction is used to verify the transfer of ownership of the bitcoins
+     being spent. It doesn't prevent impersonation by itself, but the combination of the previous signature and
+     the digital signatures used to verify the identity of the sender help prevent impersonation
+     in the overall blockchain system. The digital signatures, which are created using the private key of the sender,
+     provide a way to mathematically verify that the sender of a transaction is indeed the owner of the wallet,
+     and the previous signature ensures that the bitcoins being spent have not already been spent in a previous transaction.
 
 
 4. Scalability: The increasing number of transactions on the blockchain can lead to scalability issues such as
