@@ -332,8 +332,6 @@ Bitcoin transactions ensure integrity from the following topics by using cryptog
      새 node 또는 재결합 node에 대한 네트워크 동기화에 도움을 줄 수 있다. 또한 일부 블록체인 네트워크는 이러한 블록을 사용해 miner에 대한
      보상 분배를 결정할 수 있으며 일부는 네트워크 기록을 보존하기 위해 향후 블록에 포함할 수 있다. 따라서 orphan or stale blocks들도
      블록체인 시스템의 전체 기능 내에서 여전히 가치와 목적을 가지고 있다.
-   \
-   \
    
    Make sure that anyone output is never used as an input more than once.
    This can be done by maintaining a pool of unsepent outputs and rejecting any transaction that
@@ -343,7 +341,7 @@ Bitcoin transactions ensure integrity from the following topics by using cryptog
 3. Impersonation: Bitcoin uses digital signatures to verify the identity of the sender and prevent impersonation.
    The sender's public key is used to encrypt the transaction, and the private key is used to decrypt it.
    This ensures that the transaction is initiated by the owner of the wallet and not by an impersonator.
-   - How about Input's previous output signature?
+   - How about Input's signature(previous output's signature)?
      The previous signature in the input of a transaction is used to verify the transfer of ownership of the bitcoins
      being spent. It doesn't prevent impersonation by itself, but the combination of the previous signature and
      the digital signatures used to verify the identity of the sender help prevent impersonation
@@ -376,5 +374,36 @@ Bitcoin transactions ensure integrity from the following topics by using cryptog
    where a group of miners control more than half of the network's computational power and can manipulate the blockchain.
    Solutions to this problem include using consensus algorithms that are less vulnerable to 51% attacks,
    such as Proof of Stake, and implementing better security measures to protect the network.
+
+### Updating our blockchain
+Now we have to maintain a list of unspent outputs. This will just be a set of hashes of the unspent outputs.
+Note that this does not differentiate between two outputs that are to the same address for the same amount.
+
+This will be fixed later.
+
+We have to validate three more conditions now:
+- Can we spend the input?
+- How many coins are in the output?
+- Is the coinbase transaction valid? (We're going to skimp a bit on this check for now.)
+
+### Writing a working example
+We need to:
+1. Create a genesis block with transactions.
+2. Mine it.
+3. Add it to the blockchain.
+4. Create another block with more transactions(particularly some that use transactions from the first block).
+5. Mine that one.
+6. Add that one to the blockchain.
+
+### Note
+
+Here are some things to take into account about the code we just wrote:
+
+- The difficulty stored in a block is not validated.
+- The value of the coinbase transaction is not validated.
+- "Coin ownership" is neither enforced nor existent.
+- Two otherwise identical outputs from different transactions are indistinguishable.
+- etc
+
 
 ## 4. smart contracts

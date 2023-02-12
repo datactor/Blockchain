@@ -3,14 +3,17 @@ use chrono::prelude::*;
 mod block;
 mod hashable;
 mod blockchain;
+pub mod transaction;
 
 pub use crate::{ // Leave main.rs compact. mods loaded into lib.rs from elsewhere can be used in main.rs without specifying them in main.rs
     block::Block,
     hashable::Hashable,
     blockchain::Blockchain,
+    transaction::Transaction,
 };
 
-type BlockHash = Vec<u8>;
+type Hash = Vec<u8>;
+type Address = String;
 
 pub fn now() -> u128 {
     Utc::now().timestamp_millis() as u128
