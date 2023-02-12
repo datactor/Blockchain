@@ -12,7 +12,7 @@ Blockchain = chronological, sequential list of blocks
 
 ## 1. Blocks & hashing
 block & block chain? linked list or linked array. 
-   
+
 Blocks contain this informs:
 - Index: this block's location within the list of blocks
 - Payload: any relevant information or events that have
@@ -375,19 +375,19 @@ Bitcoin transactions ensure integrity from the following topics by using cryptog
    Solutions to this problem include using consensus algorithms that are less vulnerable to 51% attacks,
    such as Proof of Stake, and implementing better security measures to protect the network.
 
-### Updating our blockchain
-Now we have to maintain a list of unspent outputs. This will just be a set of hashes of the unspent outputs.
+### Updating blockchain
+Maintain a list of unspent outputs. This will just be a set of hashes of the unspent outputs.
 Note that this does not differentiate between two outputs that are to the same address for the same amount.
 
 This will be fixed later.
 
-We have to validate three more conditions now:
+validate three more conditions:
 - Can we spend the input?
 - How many coins are in the output?
 - Is the coinbase transaction valid? (We're going to skimp a bit on this check for now.)
 
 ### Writing a working example
-We need to:
+needs:
 1. Create a genesis block with transactions.
 2. Mine it.
 3. Add it to the blockchain.
@@ -397,7 +397,7 @@ We need to:
 
 ### Note
 
-Here are some things to take into account about the code we just wrote:
+Here are some things to take into account about the code:
 
 - The difficulty stored in a block is not validated.
 - The value of the coinbase transaction is not validated.
