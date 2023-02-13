@@ -60,12 +60,18 @@ impl Blockchain {
         }
 
         if let Some((coinbase, transactions)) = block.transactions.split_first() {
+            // 비트코인의 경우 transaction field(Vec<transaction>)에 항상 coinbase transaction이 포함되어 있다.
+            // 왜? coinbase transaction은 블록을 블록체인에 추가하는 채굴자에게 "인센티브"를 주는 역할을 하기 때문에 항상 포함되어 있음.
+            // 현재 기준으로 block 보상인 6.25 btc는 fixed specified 되어 있고, 선택적으로 다른 TX에서 발생하는
+            // TX fee도 포함되어 있을 수 있다.
             if !coinbase.is_coinbase() {
+                // if block.index == 0 {
                 return Err(BlockValidationErr::InvalidCoinbaseTransaction)
+                // }
             }
             let mut block_spent: HashSet<Hash> = HashSet::new();
             let mut block_created: HashSet<Hash> = HashSet::new();
-            let mut total_fee = 0;
+            let mut total_fee = 1;
 
             for transaction in transactions {
                 let input_hashes = transaction.input_hashes();

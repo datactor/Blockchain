@@ -18,6 +18,7 @@ impl Hashable for Output {
     }
 }
 
+#[derive(Clone)]
 pub struct Transaction {
     pub inputs: Vec<Output>,
     pub outputs: Vec<Output>,
