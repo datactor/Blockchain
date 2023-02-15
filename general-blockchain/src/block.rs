@@ -88,7 +88,7 @@ pub fn check_difficulty(hash: &Hash, difficulty: u128) -> bool {
     difficulty > difficulty_bytes_as_u128(&hash)
 }
 
-fn merkle_root(hashes: &[Hash]) -> Hash {
+pub fn merkle_root(hashes: &[Hash]) -> Hash {
     let mut hashes = hashes.to_owned();
     while hashes.len() > 1 {
         // 홀수일 경우 마지막 해시를 벡터에 추가

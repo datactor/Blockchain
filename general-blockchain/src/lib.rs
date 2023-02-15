@@ -1,6 +1,6 @@
 use chrono::prelude::*;
 
-mod block;
+pub mod block;
 mod hashable;
 mod blockchain;
 pub mod transaction;

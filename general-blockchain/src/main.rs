@@ -2,7 +2,7 @@ use blockchainlib::*;
 use std::{
     io::{self, prelude::*},
 };
-use blockchainlib::transaction::Output;
+
 
 fn main() {
     let mut input = String::new();
@@ -53,14 +53,20 @@ fn main() {
 
     // 2. 채굴자가 다른 node로부터 갱신된 block을 받아 mining함(mining 수행 전에 txid들로 merkle_root를
     // 자체적으로 계산해 보고 블록헤더에서 받은 merkle_root와 동일한지 체크하고 동일하면 mining, 다르다면 버린다.)
-    new_block.mine();
 
-    println!("Mined block {:?}", &new_block);
+    // Integrity check with merkle root
+    let tx_hashes = new_block.transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
+    if new_block.merkle_root == block::merkle_root(&tx_hashes) {
+        new_block.mine();
+
+        println!("Mined block {:?}", &new_block);
+    }
+
 
     // mining이 성공적으로 완료된다면 네트워크로 보낸다. 네트워크는 완료된 블록을 blockchain에 추가하기 전에
     // broadcast해 다른 node들(miner)에게도 merkle root를 추가적으로 검증하게 한다. 이 과정은 채굴이 아니다.
     // 추가적 검증이 완료되면 blockchain에 추가시킨다. 그렇지만 이것으로 최종 blockchain이 결정되는 것은 아니다.
-    // btc에는 '확인 임계값(confirmation thresholds)'이라는 chain rule이 있는데, 그 위에 6개의 추가적인 block이 형성될
+    // btc에는 '확인 임계값(confirmation thresholds)'이라는 chain rule이 있는데, 그 위에 6개의 추가적인 block이 쌓일
     // 때까지 최종 블록으로 간주하지 않는다. 총 7개의 blockchain에 추가된 block 중, 누적 PoW가 가장 많은,
     // 가장 긴 chain(longest 또는 heaviest chain이라고 함) 하나가 Winner가 되어 네트워크의 유효한 block으로 간주된다.
     // Winner로 선택되지 않은 나머지 6개의 block은 여전히 네트워크에 존재하고, 블록체인에도 같은 layer에 존재하지만
@@ -88,7 +94,7 @@ fn main() {
 
 // 이전 블록들에서 UTXO를 불러와서 최적의 transaction value를 맞추는 Input을 자동으로 넣어야 함.
 // merkle tree에 대해 알아보자
-fn spawn_block(difficulty: u128, prev_block: &Block, recipient: String, amount: u64, _opt_input: Vec<Output>) -> Block {
+fn spawn_block(difficulty: u128, prev_block: &Block, recipient: String, amount: u64, _opt_input: Vec<transaction::Output>) -> Block {
     let input = prev_block.transactions[0].outputs[0].clone(); // 임시 단일 input
     let val = input.value;
     let add = input.to_addr.clone();
