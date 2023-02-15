@@ -9,13 +9,13 @@ pub struct Block {
     pub prev_block_hash: Hash,
     pub merkle_root: Hash,
     pub nonce: u64,
-    pub transactions: Vec<Transaction>, // for Bitcoin this field is 'transaction: Vec<Transaction>,'
+    pub transactions: Vec<Transaction>,
     pub difficulty: u128,
 }
 
 impl Debug for Block {
     fn fmt (&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "Block[{}]: {:?} at: {} with: {} nonce: {}",
+        write!(f, "Block[{}]: {} at: {} with: {} nonce: {}",
                &self.index,
                &hex::encode(&self.hash),
                &self.timestamp,
@@ -89,16 +89,21 @@ pub fn check_difficulty(hash: &Hash, difficulty: u128) -> bool {
 }
 
 fn merkle_root(hashes: &[Hash]) -> Hash {
-    let mut hashes = hashes.to_vec();
+    let mut hashes = hashes.to_owned();
     while hashes.len() > 1 {
+        // 홀수일 경우 마지막 해시를 벡터에 추가
         if hashes.len() % 2 == 1 {
-            hashes.push(hashes[hashes.len() - 1].clone());
+            hashes.push(hashes.last().unwrap().to_owned());
         }
         let mut new_hashes = vec![];
         for i in (0..hashes.len()).step_by(2) {
+            // 쌍을 이뤄주고, extending해서 하나 부모 노드로 만듬
             let mut new_hash = Vec::new();
             new_hash.extend(hashes[i].clone());
             new_hash.extend(hashes[i+1].clone());
+
+            // Merkle 트리의 각 부모 노드는 두 자식 노드의 연결된 hash를 hashing하여 구성된다.
+            // extending된 쌍의 hash를 한번 더 hashing하여 부모 노드로 만들어준다.
             new_hash = crypto_hash::digest(crypto_hash::Algorithm::SHA256, &new_hash);
 
             new_hashes.push(new_hash);

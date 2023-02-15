@@ -12,6 +12,7 @@ pub enum BlockValidationErr {
     InvalidInput,
     InsufficientInputValue,
     InvalidCoinbaseTransaction,
+    InvalidMerkleRoot,
 }
 
 pub struct Blockchain {
@@ -71,7 +72,7 @@ impl Blockchain {
             }
             let mut block_spent: HashSet<Hash> = HashSet::new();
             let mut block_created: HashSet<Hash> = HashSet::new();
-            let mut total_fee = 1;
+            let mut total_fee = 0;
 
             for transaction in transactions {
                 let input_hashes = transaction.input_hashes();
@@ -94,6 +95,11 @@ impl Blockchain {
 
                 block_spent.extend(input_hashes);
                 block_created.extend(transaction.output_hashes());
+
+                // get txid
+                let hashed_tx = transaction.hash();
+                let txid = &hex::encode(hashed_tx);
+                println!("TxID: {}", txid);
             }
 
             if coinbase.output_value() < total_fee {

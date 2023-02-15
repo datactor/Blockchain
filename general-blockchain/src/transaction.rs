@@ -59,6 +59,7 @@ impl Transaction {
     }
 }
 
+// transaction 직렬화
 impl Hashable for Transaction {
     fn bytes(&self) -> Vec<u8> {
         let mut bytes = vec![];
@@ -71,7 +72,7 @@ impl Hashable for Transaction {
         );
 
         bytes.extend(
-            self.inputs
+            self.outputs
                 .iter()
                 .flat_map(|output| output.bytes())
                 .collect::<Vec<u8>>()
