@@ -74,6 +74,11 @@ impl Blockchain {
             let mut block_created: HashSet<Hash> = HashSet::new();
             let mut total_fee = 0;
 
+            // get coinbase txid
+            let hashed_coinbase_tx = coinbase.hash();
+            let coinbase_txid = &hex::encode(hashed_coinbase_tx);
+            println!("Coinbase TxId: {}", coinbase_txid);
+
             for transaction in transactions {
                 let input_hashes = transaction.input_hashes();
 
@@ -99,7 +104,7 @@ impl Blockchain {
                 // get txid
                 let hashed_tx = transaction.hash();
                 let txid = &hex::encode(hashed_tx);
-                println!("TxID: {}", txid);
+                println!("TxId: {}", txid);
             }
 
             if coinbase.output_value() < total_fee {

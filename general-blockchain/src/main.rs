@@ -1,8 +1,5 @@
-use blockchainlib::*;
-use std::{
-    io::{self, prelude::*},
-};
-
+use blockchainlib::{*, transaction::Output};
+use std::io;
 
 fn main() {
     let mut input = String::new();
@@ -28,7 +25,7 @@ fn main() {
     let prelude_of_the_legend = Transaction {
         inputs: vec![],
         outputs: vec![
-            transaction::Output {
+            Output {
                 to_addr: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".to_owned(),
                 value: 50,
             },
@@ -37,10 +34,9 @@ fn main() {
 
     genesis_block.add_transaction(prelude_of_the_legend);
 
+    genesis_block.check_merkle_and_mining().expect("Failed to execute mining");
 
-    genesis_block.mine();
-
-    println!("Mined genesis block {:?}", &genesis_block);
+    println!("Mined genesis Satoshi {:?}", &genesis_block);
 
     let mut blockchain = Blockchain::new();
 
@@ -55,13 +51,8 @@ fn main() {
     // 자체적으로 계산해 보고 블록헤더에서 받은 merkle_root와 동일한지 체크하고 동일하면 mining, 다르다면 버린다.)
 
     // Integrity check with merkle root
-    let tx_hashes = new_block.transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
-    if new_block.merkle_root == block::merkle_root(&tx_hashes) {
-        new_block.mine();
-
-        println!("Mined block {:?}", &new_block);
-    }
-
+    new_block.check_merkle_and_mining().expect("Failed to execute mining");
+    println!("Mined {:?}", &new_block);
 
     // mining이 성공적으로 완료된다면 네트워크로 보낸다. 네트워크는 완료된 블록을 blockchain에 추가하기 전에
     // broadcast해 다른 node들(miner)에게도 merkle root를 추가적으로 검증하게 한다. 이 과정은 채굴이 아니다.
@@ -78,14 +69,11 @@ fn main() {
     // 예를 들어, 만약 같은 tx들로 구성된 새로운 block들이 경쟁한다면? 하나의 강한 block만 유효하게 되고,
     // 유효한 block과 같은 tx를 가진 invaild block이 blockchain의 같은 layer에 남게된다.
     // 추후에 다른 layer에서 Winner block이, 이미 nonce가 밝혀진, 이전의 winner block과
-    // tx가 같은 invalid block을 history로 갖는다면 그것과 관계 없이 보상을 받고 layer에 추가 된다.(중복 Tx, nonce를 가진 block들이 존재)
+    // tx가 같은 invalid block을 history로 갖는다면 이 중복 block도 보상을 받고 layer에 추가 된다.(중복 Tx, nonce를 가진 block들이 존재)
     // 그렇지만 이것을 막으면 채굴자들의 보상을 줄이게 된다.
-    //
     //
 
     blockchain.update_with_block(new_block).expect("Failed to add block");
-    //
-
 
     println!("{}, {}", blockchain.blocks[1].transactions[1].outputs[0].to_addr, blockchain.blocks[1].transactions[1].outputs[0].value);
     println!("{}, {}", blockchain.blocks[1].transactions[1].outputs[1].to_addr, blockchain.blocks[1].transactions[1].outputs[1].value);
@@ -94,7 +82,7 @@ fn main() {
 
 // 이전 블록들에서 UTXO를 불러와서 최적의 transaction value를 맞추는 Input을 자동으로 넣어야 함.
 // merkle tree에 대해 알아보자
-fn spawn_block(difficulty: u128, prev_block: &Block, recipient: String, amount: u64, _opt_input: Vec<transaction::Output>) -> Block {
+fn spawn_block(difficulty: u128, prev_block: &Block, recipient: String, amount: u64, _opt_input: Vec<Output>) -> Block {
     let input = prev_block.transactions[0].outputs[0].clone(); // 임시 단일 input
     let val = input.value;
     let add = input.to_addr.clone();
@@ -112,7 +100,7 @@ fn spawn_block(difficulty: u128, prev_block: &Block, recipient: String, amount: 
     let coinbase_tx = Transaction {
         inputs: vec![],
         outputs: vec![
-            transaction::Output {
+            Output {
                 to_addr: "coinbase_to_miner".to_owned(),
                 value: block_reward,
             },
@@ -126,13 +114,13 @@ fn spawn_block(difficulty: u128, prev_block: &Block, recipient: String, amount: 
             input
         ],
         outputs: vec![
-            transaction::Output {
+            Output {
                 to_addr: recipient.clone(),
                 value: amount,
             },
             // btc network에서 요구하는 대로 Input의 총 가치가 출력의 총 가치와 동일하도록 하기 위해
             // 본인에게 반환되는 Output 추가.
-            transaction::Output {
+            Output {
                 to_addr: add,
                 value: if val >= amount { val - amount } else { 0 },
             },

@@ -45,6 +45,12 @@ impl Block {
         }
     }
 
+    pub fn add_transaction(&mut self, transaction: Transaction) {
+        self.transactions.push(transaction);
+        let new_tx_hashes = self.transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
+        self.merkle_root = merkle_root(&new_tx_hashes);
+    }
+
     // O(N) N = 2.pow(64)
     pub fn mine(&mut self) {
         for nonce_attempt in 0..(u64::MAX) {
@@ -57,10 +63,14 @@ impl Block {
         }
     }
 
-    pub fn add_transaction(&mut self, transaction: Transaction) {
-        self.transactions.push(transaction);
-        let new_tx_hashes = self.transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
-        self.merkle_root = merkle_root(&new_tx_hashes);
+    pub fn check_merkle_and_mining(&mut self) -> Result<(), blockchain::BlockValidationErr> {
+        let tx_hashes = self.transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
+        if self.merkle_root == block::merkle_root(&tx_hashes) {
+            self.mine();
+        } else {
+            return Err(blockchain::BlockValidationErr::InvalidMerkleRoot)
+        }
+        Ok(())
     }
 }
 
