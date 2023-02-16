@@ -65,7 +65,7 @@ impl Block {
 
     pub fn check_merkle_and_mining(&mut self) -> Result<(), blockchain::BlockValidationErr> {
         let tx_hashes = self.transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
-        if self.merkle_root == block::merkle_root(&tx_hashes) {
+        if self.merkle_root == merkle_root(&tx_hashes) {
             self.mine();
         } else {
             return Err(blockchain::BlockValidationErr::InvalidMerkleRoot)
