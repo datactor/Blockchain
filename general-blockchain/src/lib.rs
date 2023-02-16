@@ -5,12 +5,14 @@ mod hashable;
 mod blockchain;
 pub mod transaction;
 pub mod app;
+pub mod utxo;
 
 pub use crate::{ // Leave main.rs compact. mods loaded into lib.rs from elsewhere can be used in main.rs without specifying them in main.rs
     block::Block,
     hashable::Hashable,
     blockchain::Blockchain,
     transaction::Transaction,
+    utxo::UtxoSet,
 };
 
 type Hash = Vec<u8>;

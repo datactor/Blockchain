@@ -1,5 +1,5 @@
 use super::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 // custom Error type
 #[derive(Debug)]
@@ -16,21 +16,23 @@ pub enum BlockValidationErr {
 }
 
 pub struct Blockchain {
-    pub blocks: Vec<Block>,
+    pub chain: Vec<Block>,
+    // pub index: HashMap<Hash, u32>,
     unspent_outputs: HashSet<Hash>,
 }
 
 impl Blockchain {
     pub fn new() -> Self {
         Blockchain {
-            blocks: vec![],
+            chain: vec![],
             unspent_outputs: HashSet::new(),
         }
     }
 
     // integrity test
-    pub fn update_with_block(&mut self, block: Block) -> Result<(), BlockValidationErr> {
-        let i = self.blocks.len();
+    pub fn update_with_block(&mut self, block: Block, utxo_set: &mut UtxoSet, sender: &String, recipient: &String) -> Result<(), BlockValidationErr> {
+        let script_pubkey = format!("{}:{}", sender, recipient);
+        let i = self.chain.len();
 
         // 1. index check
         if block.index as usize != i {
@@ -41,7 +43,7 @@ impl Blockchain {
         } else if i != 0 {
             // Not genesis block
             // 3. time elapsed or not
-            let prev_block = &self.blocks[i-1];
+            let prev_block = &self.chain[i-1];
             // It is unlikely for a block to be mined within 1 millisecond.
             // The timestamp is the same as the previous value,
             // but most coins will pass the integrity check only
@@ -75,17 +77,35 @@ impl Blockchain {
             let mut total_fee = 0;
 
             // get coinbase txid
+            // println!("Coinbase TxId: {}", coinbase_txid);
+
             let hashed_coinbase_tx = coinbase.hash();
             let coinbase_txid = &hex::encode(hashed_coinbase_tx);
-            println!("Coinbase TxId: {}", coinbase_txid);
+            for (output_index, output) in coinbase.outputs.iter().enumerate() {
+                utxo_set.add_utxo(coinbase_txid.clone(), output_index, output.value, script_pubkey.to_owned());
+            }
 
             for transaction in transactions {
+                // utxo set에 추가.
+                let txid = &hex::encode(transaction.hash());
+                for (output_index, output) in transaction.outputs.iter().enumerate() {
+                    utxo_set.add_utxo(txid.clone(), output_index, output.value, script_pubkey.to_owned());
+                }
+
+                if let Some(input) = utxo_set.get_optimal_inputs(44) {
+                    println!("opt utxo: {:?}", input);
+                }
+
+
+
+
                 let input_hashes = transaction.input_hashes();
 
-                if !(&input_hashes - &self.unspent_outputs).is_empty() ||
-                    !(&input_hashes & &block_spent).is_empty() {
-                    return Err(BlockValidationErr::InvalidInput)
-                }
+
+                // if !(&input_hashes - &self.unspent_outputs).is_empty() ||
+                //     !(&input_hashes & &block_spent).is_empty() {
+                //     return Err(BlockValidationErr::InvalidInput)
+                // }
 
                 let input_value = transaction.input_value();
                 let output_value = transaction.output_value();
@@ -117,9 +137,35 @@ impl Blockchain {
             self.unspent_outputs.retain(|output| !block_spent.contains(output));
 
             self.unspent_outputs.extend(block_created);
-        }
 
-        self.blocks.push(block);
+
+            for utxo in &utxo_set.utxos {
+                println!("{:?}", utxo);
+            }
+
+        }
+        //
+        // self.chain.push(block);
+
+        // // coinbase로 나누지 않고 해보자
+        // if !block.transactions[0].is_coinbase() {
+        //     return Err(BlockValidationErr::InvalidCoinbaseTransaction)
+        // }
+        //
+        // for transaction in block.transactions {
+        //     let txid = &hex::encode(transaction.hash());
+        //     for (output_index, output) in transaction.outputs.iter().enumerate() {
+        //         utxo_set.add_utxo(txid.clone(), output_index, output.value, SCRIPT_PUBKEY.clone());
+        //     }
+        // }
+
+
+
+
+
+
+
+        self.chain.push(block);
 
         Ok(())
     }
