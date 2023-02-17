@@ -27,7 +27,7 @@ pub fn run() {
         difficulty
     );
 
-    let prelude_of_the_legend = Transaction {
+    let satoshi_tx = Transaction {
         inputs: vec![],
         outputs: vec![
             transaction::Output {
@@ -37,7 +37,7 @@ pub fn run() {
         ],
     };
 
-    genesis_block.add_transaction(prelude_of_the_legend);
+    genesis_block.add_transaction(satoshi_tx);
 
     let mut utxo_set = UtxoSet::new();
 
@@ -47,7 +47,7 @@ pub fn run() {
 
     let mut blockchain = Blockchain::new();
 
-    blockchain.update_with_block(genesis_block, &mut utxo_set, &"genesis".to_string(), &recipient).expect("Failed to add genesis block");
+    blockchain.update_with_block(genesis_block, &mut utxo_set, &"genesis".to_string()).expect("Failed to add genesis block");
 
 
     // new_block(네트워크에서 tx를 받아 block을 생성할 때)
@@ -79,18 +79,14 @@ pub fn run() {
     // tx가 같은 invalid block을 history로 갖는다면 이 중복 block도 보상을 받고 layer에 추가 된다.(중복 Tx, nonce를 가진 block들이 존재)
     // 그렇지만 이것을 막으면 채굴자들의 보상을 줄이게 된다.
 
-    blockchain.update_with_block(new_block, &mut utxo_set, &sender, &recipient).expect("Failed to add block");
+    blockchain.update_with_block(new_block, &mut utxo_set, &sender).expect("Failed to add block");
 
     println!("{}, {}", blockchain.chain[1].transactions[1].outputs[0].to_addr, blockchain.chain[1].transactions[1].outputs[0].value);
     println!("{}, {}", blockchain.chain[1].transactions[1].outputs[1].to_addr, blockchain.chain[1].transactions[1].outputs[1].value);
 }
 
 fn spawn_block(difficulty: u128, prev_block: &Block, sender: String, recipient: String, mut amount: u64, utxo_set: &UtxoSet) -> Block {
-    // let tmp_input = prev_block.transactions[0].outputs[0].clone(); // 임시 단일 input
-    // let val = tmp_input.value;
-    // let add = tmp_input.to_addr.clone();
     let fee = 0;
-
 
     let block_reward = 7; // 블록보상 6.25 + 추가적인 transaction fee
     // println!("{:?}", val);
@@ -103,11 +99,13 @@ fn spawn_block(difficulty: u128, prev_block: &Block, sender: String, recipient: 
     );
 
     // coinbase transaction
+    // 블록을 생성한 광부. 마이닝 해서 블록체인에 붙이려고 시도한다.
+    // 이 coinbase tx의 sender도 광부, recipient도 광부. coinbase address라고 불린다.
     let coinbase_tx = Transaction {
         inputs: vec![],
         outputs: vec![
             transaction::Output {
-                to_addr: "coinbase_to_miner".to_owned(),
+                to_addr: "coinbase_miner".to_owned(),
                 value: block_reward,
             },
         ],
@@ -119,14 +117,15 @@ fn spawn_block(difficulty: u128, prev_block: &Block, sender: String, recipient: 
 
     let inputs;
     if let Some(input) = utxo_set.get_optimal_inputs(amount) {
-        inputs = input.iter().map(|(txid, txid_idx, input_amount, script_pubkey)| (input_amount.clone(), script_pubkey.clone())).collect::<Vec<_>>();
-        println!("opt utxo: {:?}", inputs);
+        inputs = input.iter().map(
+            |(txid, txid_idx, input_amount, script_pubkey)| (format!("{}:{}", txid, txid_idx), input_amount.clone(), script_pubkey.clone()))
+            .collect::<Vec<_>>();
     } else {
         panic!("You cannot transfer more than the remaining UTXO.");
     }
 
     let mut sub_amount = amount;
-    for (input_amount, script_pubkey) in inputs {
+    for (txid_idx, input_amount, script_pubkey) in inputs {
         let input_to_addr = script_pubkey.split(":").nth(1).unwrap();
         if input_amount < amount {
             sub_amount = input_amount + fee;
@@ -139,6 +138,7 @@ fn spawn_block(difficulty: u128, prev_block: &Block, sender: String, recipient: 
                 value: sub_amount,
             }
         ];
+
         if input_amount > sub_amount {
             // change.
             // btc network에서 요구하는 대로 Input의 총 가치가 출력의 총 가치와 동일하도록 하기 위해
@@ -151,58 +151,21 @@ fn spawn_block(difficulty: u128, prev_block: &Block, sender: String, recipient: 
             )
         };
 
+        let mut inputs = Vec::new();
+        inputs.push((
+            transaction::Output {
+                to_addr: input_to_addr.to_owned(),
+                value: input_amount,
+            }, txid_idx
+        ));
+
         let transaction = Transaction {
-            inputs: vec![
-                transaction::Output {
-                        to_addr: input_to_addr.to_owned(),
-                        value: input_amount,
-                    },
-            ],
+            inputs,
             outputs,
         };
 
         block.add_transaction(transaction);
     }
-
-
-
-
-    ///////////
-
-    // let transaction = match val {
-    //     val if val > amount => {
-    //         Transaction {
-    //             inputs: vec![tmp_input],
-    //             outputs: vec![
-    //                 transaction::Output {
-    //                     to_addr: recipient.clone(),
-    //                     value: amount,
-    //                 },
-    //                 // btc network에서 요구하는 대로 Input의 총 가치가 출력의 총 가치와 동일하도록 하기 위해
-    //                 // 본인에게 반환되는 Output 추가.
-    //                 transaction::Output {
-    //                     to_addr: add,
-    //                     value: if val >= amount { val - amount } else { 0 },
-    //                 },
-    //             ]
-    //         }
-    //     },
-    //     _ => {
-    //         Transaction {
-    //             inputs: vec![tmp_input],
-    //             outputs: vec![
-    //                 transaction::Output {
-    //                     to_addr: recipient.clone(),
-    //                     value: amount,
-    //                 },
-    //                 // btc network에서 요구하는 대로 Input의 총 가치가 출력의 총 가치와 동일하도록 하기 위해
-    //                 // 본인에게 반환되는 Output 추가.
-    //             ]
-    //         }
-    //     }
-    // };
-
-    // block.add_transaction(transaction);
 
     block.clone()
 }

@@ -20,7 +20,7 @@ impl Hashable for Output {
 
 #[derive(Clone)]
 pub struct Transaction {
-    pub inputs: Vec<Output>,
+    pub inputs: Vec<(Output, String)>,
     pub outputs: Vec<Output>,
 }
 
@@ -28,7 +28,7 @@ impl Transaction {
     pub fn input_value(&self) -> u64 {
         self.inputs
             .iter()
-            .map(|input| input.value)
+            .map(|input| input.0.value)
             .sum()
     }
 
@@ -42,7 +42,7 @@ impl Transaction {
     pub fn input_hashes(&self) -> HashSet<Hash> {
         self.inputs
             .iter()
-            .map(|input| input.hash())
+            .map(|input| input.0.hash())
             .collect::<HashSet<Hash>>()
     }
 
@@ -67,7 +67,7 @@ impl Hashable for Transaction {
         bytes.extend(
             self.inputs
                 .iter()
-                .flat_map(|input| input.bytes())
+                .flat_map(|input| input.0.bytes())
                 .collect::<Vec<u8>>()
         );
 

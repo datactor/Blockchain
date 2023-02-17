@@ -13,6 +13,7 @@ pub enum BlockValidationErr {
     InsufficientInputValue,
     InvalidCoinbaseTransaction,
     InvalidMerkleRoot,
+    UtxoSpentFailure,
 }
 
 pub struct Blockchain {
@@ -30,8 +31,7 @@ impl Blockchain {
     }
 
     // integrity test
-    pub fn update_with_block(&mut self, block: Block, utxo_set: &mut UtxoSet, sender: &String, recipient: &String) -> Result<(), BlockValidationErr> {
-        let script_pubkey = format!("{}:{}", sender, recipient);
+    pub fn update_with_block(&mut self, block: Block, utxo_set: &mut UtxoSet, sender: &String) -> Result<(), BlockValidationErr> {
         let i = self.chain.len();
 
         // 1. index check
@@ -68,9 +68,7 @@ impl Blockchain {
             // 현재 기준으로 block 보상인 6.25 btc는 fixed specified 되어 있고, 선택적으로 다른 TX에서 발생하는
             // TX fee도 포함되어 있을 수 있다.
             if !coinbase.is_coinbase() {
-                // if block.index == 0 {
                 return Err(BlockValidationErr::InvalidCoinbaseTransaction)
-                // }
             }
             let mut block_spent: HashSet<Hash> = HashSet::new();
             let mut block_created: HashSet<Hash> = HashSet::new();
@@ -82,6 +80,7 @@ impl Blockchain {
             let hashed_coinbase_tx = coinbase.hash();
             let coinbase_txid = &hex::encode(hashed_coinbase_tx);
             for (output_index, output) in coinbase.outputs.iter().enumerate() {
+                let script_pubkey = format!("{}:{}", &output.to_addr, &output.to_addr); // coinbase_tx의 sender와 recipient는 모두 같은 광부임
                 utxo_set.add_utxo(coinbase_txid.clone(), output_index, output.value, script_pubkey.to_owned());
             }
 
@@ -89,23 +88,16 @@ impl Blockchain {
                 // utxo set에 추가.
                 let txid = &hex::encode(transaction.hash());
                 for (output_index, output) in transaction.outputs.iter().enumerate() {
+                    let script_pubkey = format!("{}:{}", sender, &output.to_addr);
                     utxo_set.add_utxo(txid.clone(), output_index, output.value, script_pubkey.to_owned());
                 }
 
-                if let Some(input) = utxo_set.get_optimal_inputs(44) {
-                    println!("opt utxo: {:?}", input);
-                }
-
-
-
-
                 let input_hashes = transaction.input_hashes();
 
-
-                // if !(&input_hashes - &self.unspent_outputs).is_empty() ||
-                //     !(&input_hashes & &block_spent).is_empty() {
-                //     return Err(BlockValidationErr::InvalidInput)
-                // }
+                if !(&input_hashes - &self.unspent_outputs).is_empty() ||
+                    !(&input_hashes & &block_spent).is_empty() {
+                    return Err(BlockValidationErr::InvalidInput)
+                }
 
                 let input_value = transaction.input_value();
                 let output_value = transaction.output_value();
@@ -124,7 +116,13 @@ impl Blockchain {
                 // get txid
                 let hashed_tx = transaction.hash();
                 let txid = &hex::encode(hashed_tx);
-                println!("TxId: {}", txid);
+                // println!("TxId: {}", txid);
+
+                // remove used UTXOs.
+                for (_, txid_index) in transaction.inputs.iter() {
+                    let mut parts = txid_index.split(":");
+                    utxo_set.spend(parts.next().unwrap().to_owned(), parts.next().unwrap().parse::<usize>().unwrap()).expect("Utxo does not exist");
+                }
             }
 
             if coinbase.output_value() < total_fee {
@@ -138,32 +136,10 @@ impl Blockchain {
 
             self.unspent_outputs.extend(block_created);
 
-
             for utxo in &utxo_set.utxos {
                 println!("{:?}", utxo);
             }
-
         }
-        //
-        // self.chain.push(block);
-
-        // // coinbase로 나누지 않고 해보자
-        // if !block.transactions[0].is_coinbase() {
-        //     return Err(BlockValidationErr::InvalidCoinbaseTransaction)
-        // }
-        //
-        // for transaction in block.transactions {
-        //     let txid = &hex::encode(transaction.hash());
-        //     for (output_index, output) in transaction.outputs.iter().enumerate() {
-        //         utxo_set.add_utxo(txid.clone(), output_index, output.value, SCRIPT_PUBKEY.clone());
-        //     }
-        // }
-
-
-
-
-
-
 
         self.chain.push(block);
 

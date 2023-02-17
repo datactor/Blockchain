@@ -1,5 +1,6 @@
 use super::*;
 use std::collections::HashMap;
+use crate::blockchain::BlockValidationErr;
 
 #[derive(Debug, Clone)]
 pub struct Utxo {
@@ -28,9 +29,12 @@ impl UtxoSet {
         self.utxos.insert(key, utxo);
     }
 
-    pub fn spend(&mut self, txid: String, output_index: usize) {
+    pub fn spend(&mut self, txid: String, output_index: usize) -> Result<(), BlockValidationErr> {
         let key = format!("{}:{}", txid, output_index);
-        self.utxos.remove(&key);
+        match self.utxos.remove(&key) {
+            None => return Err(BlockValidationErr::UtxoSpentFailure),
+            _ => Ok(())
+        }
     }
 
     pub fn get_balance(&self) -> u64 {
@@ -46,9 +50,6 @@ impl UtxoSet {
         // let mut utxo = self.utxos;
         let mut utxos: Vec<(&String, &Utxo)> = self.utxos.iter().collect();
         utxos.sort_by(|a, b| b.1.value.cmp(&a.1.value));
-        for i in &utxos {
-            println!("sorted: {:?}", i);
-        }
 
         // Next, iterate over the UTXOs to find the optimal inputs
         let mut total_value = 0;
