@@ -18,16 +18,93 @@ pub enum BlockValidationErr {
 
 pub struct Blockchain {
     pub chain: Vec<Block>,
-    // pub index: HashMap<Hash, u32>,
-    unspent_outputs: HashSet<Hash>,
-}
+    pub tip: Hash, // self.chain.last().unwrap()과 같음. 그럼에도 넣은 이유는? 최신 유효 블록에 빠르게 엑세스하기 위함.
+}                  // chain.last()를 불러오기 위해 전체 chain을 메모리에 올리는 과정 생략.
 
 impl Blockchain {
     pub fn new() -> Self {
         Blockchain {
             chain: vec![],
-            unspent_outputs: HashSet::new(),
+            tip: vec![],
         }
+    }
+
+    pub fn spawn_block(&self, difficulty: u128, sender: String, recipient: String, mut amount: u64, utxo_set: &UtxoSet) -> Block {
+        let fee = 0;
+
+        let block_reward = 7; // 블록보상 6.25 + 추가적인 transaction fee
+        // println!("{:?}", val);
+
+        let mut block = Block::new(
+            self.chain.last().unwrap().index + 1,
+            now(),
+            self.chain.last().unwrap().hash.clone(),
+            vec![],
+            difficulty
+        );
+
+        // coinbase transaction
+        // 블록을 생성한 광부. 마이닝 해서 블록체인에 붙이려고 시도한다.
+        // 이 coinbase tx의 sender도 광부, recipient도 광부. coinbase address라고 불린다.
+        let coinbase_tx = Transaction {
+            inputs: vec![],
+            outputs: vec![
+                transaction::Output {
+                    to_addr: "coinbase_miner".to_owned(),
+                    value: block_reward,
+                },
+            ],
+        };
+
+        block.add_transaction(coinbase_tx);
+
+        let inputs = utxo_set.get_optimal_inputs(amount).expect("Insufficient UTXO");
+
+        let mut sub_amount = amount;
+        for (txid, idx, input_amount, script_pubkey) in inputs {
+            let txid_idx = format!("{}:{}", txid, idx);
+            let input_to_addr = script_pubkey.split(":").nth(1).unwrap();
+            if input_amount < amount {
+                sub_amount = input_amount + fee;
+                amount -= sub_amount;
+            }
+
+            let mut outputs = vec![
+                transaction::Output {
+                    to_addr: recipient.clone(),
+                    value: sub_amount,
+                }
+            ];
+
+            if input_amount > sub_amount {
+                // change.
+                // btc network에서 요구하는 대로 Input의 총 가치가 출력의 총 가치와 동일하도록 하기 위해
+                // 본인에게 반환되는 Output 추가.
+                outputs.push(
+                    transaction::Output {
+                        to_addr: sender.clone(),
+                        value: input_amount - sub_amount,
+                    },
+                )
+            };
+
+            let mut inputs = Vec::new();
+            inputs.push((
+                transaction::Output {
+                    to_addr: input_to_addr.to_owned(),
+                    value: input_amount,
+                }, txid_idx
+            ));
+
+            let transaction = Transaction {
+                inputs,
+                outputs,
+            };
+
+            block.add_transaction(transaction);
+        }
+
+        block.clone()
     }
 
     // integrity test
@@ -55,6 +132,7 @@ impl Blockchain {
             } else if block.prev_block_hash != prev_block.hash {
                 return Err(BlockValidationErr::MismatchedPreviousHash)
             }
+            self.tip = block.prev_block_hash.clone();
         } else {
             // Genesis block
             if block.prev_block_hash != vec![0; 32] {
@@ -70,8 +148,8 @@ impl Blockchain {
             if !coinbase.is_coinbase() {
                 return Err(BlockValidationErr::InvalidCoinbaseTransaction)
             }
-            let mut block_spent: HashSet<Hash> = HashSet::new();
-            let mut block_created: HashSet<Hash> = HashSet::new();
+            // let mut block_spent: HashSet<Hash> = HashSet::new();
+            // let mut block_created: HashSet<Hash> = HashSet::new();
             let mut total_fee = 0;
 
             // get coinbase txid
@@ -92,12 +170,12 @@ impl Blockchain {
                     utxo_set.add_utxo(txid.clone(), output_index, output.value, script_pubkey.to_owned());
                 }
 
-                let input_hashes = transaction.input_hashes();
-
-                if !(&input_hashes - &self.unspent_outputs).is_empty() ||
-                    !(&input_hashes & &block_spent).is_empty() {
-                    return Err(BlockValidationErr::InvalidInput)
-                }
+                // let input_hashes = transaction.input_hashes();
+                //
+                // if !(&input_hashes - &self.unspent_outputs).is_empty() ||
+                //     !(&input_hashes & &block_spent).is_empty() {
+                //     return Err(BlockValidationErr::InvalidInput)
+                // }
 
                 let input_value = transaction.input_value();
                 let output_value = transaction.output_value();
@@ -110,13 +188,13 @@ impl Blockchain {
 
                 total_fee += fee;
 
-                block_spent.extend(input_hashes);
-                block_created.extend(transaction.output_hashes());
-
-                // get txid
-                let hashed_tx = transaction.hash();
-                let txid = &hex::encode(hashed_tx);
-                // println!("TxId: {}", txid);
+                // block_spent.extend(input_hashes);
+                // block_created.extend(transaction.output_hashes());
+                //
+                // // get txid
+                // let hashed_tx = transaction.hash();
+                // // let txid = &hex::encode(hashed_tx);
+                // // // println!("TxId: {}", txid);
 
                 // remove used UTXOs.
                 for (_, txid_index) in transaction.inputs.iter() {
@@ -125,16 +203,16 @@ impl Blockchain {
                 }
             }
 
-            if coinbase.output_value() < total_fee {
-                 return Err(BlockValidationErr::InvalidCoinbaseTransaction)
-            } else {
-                block_created.extend(coinbase.output_hashes());
-            }
+            // if coinbase.output_value() < total_fee {
+            //      return Err(BlockValidationErr::InvalidCoinbaseTransaction)
+            // } else {
+            //     block_created.extend(coinbase.output_hashes());
+            // }
 
-            // unspent_output인 것만 남기기
-            self.unspent_outputs.retain(|output| !block_spent.contains(output));
-
-            self.unspent_outputs.extend(block_created);
+            // // unspent_output인 것만 남기기
+            // self.unspent_outputs.retain(|output| !block_spent.contains(output));
+            //
+            // self.unspent_outputs.extend(block_created);
 
             for utxo in &utxo_set.utxos {
                 println!("{:?}", utxo);

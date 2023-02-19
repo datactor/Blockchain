@@ -6,6 +6,7 @@ mod blockchain;
 pub mod transaction;
 pub mod app;
 pub mod utxo;
+pub mod handler;
 
 pub use crate::{ // Leave main.rs compact. mods loaded into lib.rs from elsewhere can be used in main.rs without specifying them in main.rs
     block::Block,
@@ -13,6 +14,7 @@ pub use crate::{ // Leave main.rs compact. mods loaded into lib.rs from elsewher
     blockchain::Blockchain,
     transaction::Transaction,
     utxo::UtxoSet,
+    handler::*,
 };
 
 type Hash = Vec<u8>;

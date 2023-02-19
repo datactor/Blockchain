@@ -39,19 +39,19 @@ impl Transaction {
             .sum()
     }
 
-    pub fn input_hashes(&self) -> HashSet<Hash> {
-        self.inputs
-            .iter()
-            .map(|input| input.0.hash())
-            .collect::<HashSet<Hash>>()
-    }
-
-    pub fn output_hashes(&self) -> HashSet<Hash> {
-        self.outputs
-            .iter()
-            .map(|output| output.hash())
-            .collect::<HashSet<Hash>>()
-    }
+    // pub fn input_hashes(&self) -> HashSet<Hash> {
+    //     self.inputs
+    //         .iter()
+    //         .map(|input| input.0.hash())
+    //         .collect::<HashSet<Hash>>()
+    // }
+    //
+    // pub fn output_hashes(&self) -> HashSet<Hash> {
+    //     self.outputs
+    //         .iter()
+    //         .map(|output| output.hash())
+    //         .collect::<HashSet<Hash>>()
+    // }
 
     // genesis
     pub fn is_coinbase(&self) -> bool {

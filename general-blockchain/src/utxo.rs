@@ -45,9 +45,8 @@ impl UtxoSet {
         balance
     }
 
-    pub fn get_optimal_inputs(&self, target_value: u64) -> Option<Vec<(String, usize, u64, String)>> {
+    pub fn get_optimal_inputs(&self, target_value: u64) -> Result<Vec<(String, usize, u64, String)>, BlockValidationErr> {
         // First, sort the UTXOs by value in descending order
-        // let mut utxo = self.utxos;
         let mut utxos: Vec<(&String, &Utxo)> = self.utxos.iter().collect();
         utxos.sort_by(|a, b| b.1.value.cmp(&a.1.value));
 
@@ -55,7 +54,7 @@ impl UtxoSet {
         let mut total_value = 0;
         let mut optimal_inputs = Vec::new();
         for (txo_id, utxo) in utxos {
-            if total_value >= target_value {
+            if total_value > target_value {
                 // If we have already accumulated enough value, we can stop
                 break;
             }
@@ -66,10 +65,10 @@ impl UtxoSet {
         }
 
         if total_value < target_value {
-            // If we couldn't accumulate enough value, return None
-            return None;
+            // If we couldn't accumulate enough value, return Err
+            return Err(BlockValidationErr::InsufficientInputValue);
         }
 
-        Some(optimal_inputs)
+        Ok(optimal_inputs)
     }
 }

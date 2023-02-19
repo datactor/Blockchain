@@ -1,21 +1,16 @@
-use std::io;
 use super::*;
 
 pub fn run() {
-    let mut input = String::new();
+    // let mut input = String::new();
+
     println!("Enter Sender's addr: ");
-    io::stdin().read_line(&mut input).unwrap();
-    let sender = input.trim().to_owned();
-    input.clear();
+    let sender = input().input;
 
     println!("Enter Recipient's addr: ");
-    io::stdin().read_line(&mut input).unwrap();
-    let recipient = input.trim().to_owned();
-    input.clear();
+    let recipient = input().input;
 
     println!("Enter transfer amount: ");
-    io::stdin().read_line(&mut input).unwrap();
-    let amount = input.trim().parse::<u64>().unwrap();
+    let amount = input().to_u64().expect("please input correct number");
 
     let difficulty = 0x000fffffffffffffffffffffffffffff;
 
@@ -52,7 +47,7 @@ pub fn run() {
 
     // new_block(네트워크에서 tx를 받아 block을 생성할 때)
     // 1. block을 생성하고 inputs, outputs들이 있는 tx들로 각각의 txid들을 생성해 하나의 블록에 하나의 merkle_root를 생성함.
-    let mut new_block = spawn_block(difficulty, blockchain.chain.last().unwrap(), sender.to_owned(), recipient.to_owned(), amount, &utxo_set);
+    let mut new_block = blockchain.spawn_block(difficulty, sender.to_owned(), recipient.to_owned(), amount, &utxo_set);
 
     // 2. 채굴자가 다른 node로부터 갱신된 block을 받아 mining함(mining 수행 전에 txid들로 merkle_root를
     // 자체적으로 계산해 보고 블록헤더에서 받은 merkle_root와 동일한지 체크하고 동일하면 mining, 다르다면 버린다.)
@@ -81,91 +76,7 @@ pub fn run() {
 
     blockchain.update_with_block(new_block, &mut utxo_set, &sender).expect("Failed to add block");
 
-    println!("{}, {}", blockchain.chain[1].transactions[1].outputs[0].to_addr, blockchain.chain[1].transactions[1].outputs[0].value);
-    println!("{}, {}", blockchain.chain[1].transactions[1].outputs[1].to_addr, blockchain.chain[1].transactions[1].outputs[1].value);
-}
-
-fn spawn_block(difficulty: u128, prev_block: &Block, sender: String, recipient: String, mut amount: u64, utxo_set: &UtxoSet) -> Block {
-    let fee = 0;
-
-    let block_reward = 7; // 블록보상 6.25 + 추가적인 transaction fee
-    // println!("{:?}", val);
-    let mut block = Block::new(
-        prev_block.index + 1,
-        now(),
-        prev_block.hash.clone(),
-        vec![],
-        difficulty
-    );
-
-    // coinbase transaction
-    // 블록을 생성한 광부. 마이닝 해서 블록체인에 붙이려고 시도한다.
-    // 이 coinbase tx의 sender도 광부, recipient도 광부. coinbase address라고 불린다.
-    let coinbase_tx = Transaction {
-        inputs: vec![],
-        outputs: vec![
-            transaction::Output {
-                to_addr: "coinbase_miner".to_owned(),
-                value: block_reward,
-            },
-        ],
-    };
-
-    block.add_transaction(coinbase_tx);
-
-    ///////////
-
-    let inputs;
-    if let Some(input) = utxo_set.get_optimal_inputs(amount) {
-        inputs = input.iter().map(
-            |(txid, txid_idx, input_amount, script_pubkey)| (format!("{}:{}", txid, txid_idx), input_amount.clone(), script_pubkey.clone()))
-            .collect::<Vec<_>>();
-    } else {
-        panic!("You cannot transfer more than the remaining UTXO.");
+    for output in &blockchain.chain[1].transactions[1].outputs {
+        println!("{}, {}", output.to_addr, output.value)
     }
-
-    let mut sub_amount = amount;
-    for (txid_idx, input_amount, script_pubkey) in inputs {
-        let input_to_addr = script_pubkey.split(":").nth(1).unwrap();
-        if input_amount < amount {
-            sub_amount = input_amount + fee;
-            amount -= sub_amount;
-        }
-
-        let mut outputs = vec![
-            transaction::Output {
-                to_addr: recipient.clone(),
-                value: sub_amount,
-            }
-        ];
-
-        if input_amount > sub_amount {
-            // change.
-            // btc network에서 요구하는 대로 Input의 총 가치가 출력의 총 가치와 동일하도록 하기 위해
-            // 본인에게 반환되는 Output 추가.
-            outputs.push(
-                transaction::Output {
-                    to_addr: sender.clone(),
-                    value: input_amount - sub_amount,
-                },
-            )
-        };
-
-        let mut inputs = Vec::new();
-        inputs.push((
-            transaction::Output {
-                to_addr: input_to_addr.to_owned(),
-                value: input_amount,
-            }, txid_idx
-        ));
-
-        let transaction = Transaction {
-            inputs,
-            outputs,
-        };
-
-        block.add_transaction(transaction);
-    }
-
-    block.clone()
 }
