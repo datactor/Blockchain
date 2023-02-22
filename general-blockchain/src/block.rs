@@ -7,7 +7,7 @@ pub struct Block {
     // pub version: [u8; 32], // Bitcoin doesn't have an index field, so instead it contains a field representing the version of the block: 'version: [u8; 32],'
     pub timestamp: u128,
     pub hash: Hash,
-    pub prev_block_hash: Hash, // 이전 layer의 최종 block hash가 아니라, 이전 블록 중 가장 최근에 업데이트된 블록 해시.
+    pub prev_block_hash: Hash, // 이전 layer의 최종 block hash가 아닌, 이전 블록 중 가장 최근에 업데이트된 블록 해시.
     pub merkle_root: Hash,
     pub nonce: u64,
     pub transactions: Vec<Transaction>,
@@ -15,7 +15,7 @@ pub struct Block {
 }
 
 impl Debug for Block {
-    fn fmt (&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "Block[{}]: {} at: {} with: {} nonce: {}",
                &self.index,
                &hex::encode(&self.hash),

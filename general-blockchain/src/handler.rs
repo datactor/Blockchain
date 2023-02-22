@@ -6,18 +6,18 @@ use std::{
 };
 
 pub struct Scanner {
-    pub input: String,
+    pub inner: String,
 }
 
 impl Scanner {
     fn new(s: String) -> Scanner {
         Scanner {
-            input: s.trim().to_string(),
+            inner: s.trim().to_string(),
         }
     }
 
     pub fn to_u64(mut self) -> Result<u64, Box<dyn Error>> {
-        Ok(self.input.parse::<u64>().expect("please input correct number"))
+        Ok(self.inner.parse::<u64>().expect("please input correct number"))
     }
 }
 

@@ -4,10 +4,10 @@ pub fn run() {
     // let mut input = String::new();
 
     println!("Enter Sender's addr: ");
-    let sender = input().input;
+    let sender = input().inner;
 
     println!("Enter Recipient's addr: ");
-    let recipient = input().input;
+    let recipient = input().inner;
 
     println!("Enter transfer amount: ");
     let amount = input().to_u64().expect("please input correct number");
@@ -34,13 +34,13 @@ pub fn run() {
 
     genesis_block.add_transaction(satoshi_tx);
 
+    let mut blockchain = Blockchain::new();
+
     let mut utxo_set = UtxoSet::new();
 
     genesis_block.check_merkle_and_mining().expect("Failed to execute mining");
 
     println!("Mined genesis Satoshi {:?}", &genesis_block);
-
-    let mut blockchain = Blockchain::new();
 
     blockchain.update_with_block(genesis_block, &mut utxo_set, &"genesis".to_string()).expect("Failed to add genesis block");
 
