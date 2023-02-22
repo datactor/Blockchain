@@ -5,6 +5,7 @@ pub mod blockchain;
 pub mod hashable;
 pub mod transaction;
 pub mod pubkey;
+pub mod app;
 
 pub use crate::{
     block::Block,

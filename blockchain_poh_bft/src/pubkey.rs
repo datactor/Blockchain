@@ -3,9 +3,9 @@
 pub struct Pubkey([u8; 32]);
 
 impl Pubkey {
-    pub fn new(pubkey_bytes: &[u8; 32]) -> Self {
+    pub fn new(pubkey_bytes: [u8; 32]) -> Self {
         let mut arr = [0u8; 32];
-        arr[..pubkey_bytes.len()].copy_from_slice(pubkey_bytes);
+        arr[..pubkey_bytes.len()].copy_from_slice(&pubkey_bytes);
         Pubkey(arr)
     }
 }
