@@ -1,4 +1,6 @@
 use super::*;
+use rand::{rngs::OsRng, RngCore, Rng};
+use ring::signature::{Ed25519KeyPair, KeyPair};
 
 // SHA256의 digest는 언제나 256bit [u8; 32]를 반환한다.
 // 만약 [u8; 128]을 입력으로 둔다면 중복되는 값이 존재하여 충돌하지 않을까?
@@ -29,6 +31,82 @@ pub trait Hashable {
     fn update(&self) -> Vec<u8>; // extend bytes array.
 
     fn finalize(&self) -> Hash {
-        crypto_hash::digest(crypto_hash::Algorithm::SHA256, &self.update())
+        let hash_to_arr = crypto_hash::digest(
+            crypto_hash::Algorithm::SHA256,
+            &self.update()
+        )
+            .try_into()
+            .expect("Invalid bytes to hash");
+        Hash(hash_to_arr)
+    }
+}
+
+#[derive(Eq, Hash, PartialEq, Clone)]
+pub struct Hash(pub [u8; 32]);
+
+impl Hash {
+    pub fn new_rand() -> Self {
+        let mut rng = OsRng;
+        let mut bytes = [0u8; 32];
+        rng.fill(&mut bytes);
+        Self(bytes)
+    }
+}
+
+
+
+
+pub struct Privatekey(Ed25519KeyPair);
+
+impl Privatekey {
+    pub fn new() -> Self {
+        let mut rng = OsRng;
+        let mut seed = [0u8; 32];
+        rng.fill_bytes(&mut seed);
+        let keypair = Ed25519KeyPair::from_seed_unchecked(&seed).unwrap();
+        Privatekey(keypair)
+    }
+
+    pub fn sign(&self, message: &[u8]) -> [u8; 64] {
+        self.0.sign(message).as_ref().to_owned().try_into().unwrap()
+    }
+
+    pub fn pubkey(&self) -> Pubkey {
+        Pubkey(self.0.public_key().as_ref().to_owned().try_into().unwrap())
+    }
+}
+
+impl std::fmt::Debug for Privatekey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Privatekey")
+            .field(&"Invalid approach")
+            .finish()
+    }
+}
+
+
+#[derive(Eq, Hash, PartialEq, Clone)]
+pub struct Pubkey(pub(crate) [u8; 32]);
+
+impl Pubkey {
+    pub fn new(pubkey_bytes: [u8; 32]) -> Self {
+        let mut arr = [0u8; 32];
+        arr[..pubkey_bytes.len()].copy_from_slice(&pubkey_bytes);
+        Pubkey(arr)
+    }
+
+    pub fn new_rand() -> Self {
+        let mut rng = OsRng;
+        let mut bytes = [0u8; 32];
+        rng.fill(&mut bytes);
+        Self(bytes)
+    }
+}
+
+impl std::fmt::Debug for Pubkey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Pubkey")
+            .field(&hex::encode(&self.0))
+            .finish()
     }
 }

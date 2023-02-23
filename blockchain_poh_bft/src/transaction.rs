@@ -8,6 +8,55 @@ pub struct Transaction {
     pub recent_blockhash: Hash,
 }
 
+impl Transaction {
+    pub fn new(signatures: Vec<Signature>,
+               message: Message,
+               fee: u64,
+               recent_blockhash: Hash)
+        -> Self {
+        Self {
+            signatures,
+            message,
+            fee,
+            recent_blockhash,
+        }
+    }
+
+    // pub fn create(private_key: &Privatekey,
+    //               recipient_pubkey: &Pubkey,
+    //               amount: u64,
+    //               recent_blockhash: Hash) -> Self {
+    //     let message = Message::new(
+    //         &[private_key.pubkey(), recipient_pubkey],
+    //         Some(&private_key.pubkey()),
+    //         vec![Instruction::new_system_transfer(
+    //             &private_key.pubkey(),
+    //             recipient_pubkey,
+    //             amount,
+    //         )],
+    //     );
+    //     let signatures = vec![private_key.sign(&message.serialize())];
+    //     let fee = 0;
+    //     Self::new(signatures, message, fee, recent_blockhash)
+    // }
+    //
+    // pub fn sign(&mut self, private_key: &Privatekey) {
+    //     let message_bytes = self.message.serialize();
+    //     self.signatures.push(private_key.sign(&message_bytes));
+    // }
+    //
+    // pub fn verify(&self) -> bool {
+    //     let message_bytes = self.message.serialize();
+    //     for signature in &self.signatures {
+    //         if !signature.verify(&message_bytes, &self.message.account_keys[0]) {
+    //             return false;
+    //         }
+    //     }
+    //     true
+    // }
+}
+
+
 impl Hashable for Transaction {
     fn update(&self) -> Vec<u8> {
         unimplemented!()

@@ -7,20 +7,29 @@ pub fn run() {
         [0u8; 64],
         0,
         0,
-        vec![],
+        Hash([0; 32]),
         HashMap::new(),
         vec![],
         0,
         0,
         0);
 
+    let private_key = Privatekey::new();
+    println!("{:?}", private_key);
+    let recipient_pubkey = Pubkey::new_rand();
+    let amount = 100;
+    let recent_blockhash = Hash::new_rand();
+
+    // let mut tx = Transaction::create(&private_key, &recipient_pubkey, amount, recent_blockhash);
+    // tx.sign(&private_key);
+
 }
 
 pub fn add_tx() {
-    todo!(트랜잭션 생성);
+    todo!();
 }
 pub fn validate_tx() {
-    todo!(트랜잭션 검증);
+    todo!();
 }
 
 pub fn broadcast() {
@@ -34,13 +43,13 @@ pub fn broadcast() {
 }
 
 pub fn spawn_block() {
-    todo!(블록 생성)
+    todo!();
 }
 
 pub fn validate_block() {
-    todo!(블록 유효성 검사)
+    todo!();
 }
 
 pub fn update_blockcahin() {
-    todo!(blockchain에 추가)
+    todo!();
 }

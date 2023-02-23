@@ -39,7 +39,7 @@ impl Debug for Block {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "Block[{}]: {} at: {} with: {}, total: {}",
             &self.slot,
-            &hex::encode(&self.hash),
+            &hex::encode(&self.hash.0),
             &self.timestamp,
             &self.working_stake,
             &self.total_stake,
@@ -52,7 +52,7 @@ impl Block {
         signature: Signature,
         slot: u64, // index
         timestamp: u128,
-        previous_block_hash: Hash,
+        prev_block_hash: Hash,
         rewards: HashMap<Pubkey, u64>,
         transactions: Vec<Transaction>,
         // transaction_count: u64,
@@ -65,11 +65,11 @@ impl Block {
             slot: 0,
             parent_slot: 0,
             timestamp,
-            transaction_root: vec![],
+            transaction_root: Hash([0; 32]),
             is_confirmed: false,
-            prev_block_hash: previous_block_hash,
+            prev_block_hash,
             rewards,
-            hash: vec![0; 32],
+            hash: Hash([0; 32]),
             transactions,
             // transaction_count: transactions.len() as u64,
             working_stake,
@@ -98,22 +98,22 @@ impl Hashable for Block {
         bytes.extend(U64Bytes::from(&self.slot).data);
         bytes.extend(U64Bytes::from(&self.parent_slot).data);
         bytes.extend(U128Bytes::from(&self.timestamp).data);
-        bytes.extend(&self.transaction_root);
+        bytes.extend(&self.transaction_root.0);
         if self.is_confirmed {
             bytes.push(0x01);
         } else {
             bytes.push(0x00);
         }
-        bytes.extend(&self.prev_block_hash);
+        bytes.extend(&self.prev_block_hash.0);
 
         let mut rewards_map_keys = self.rewards.keys()
-            .map(|pubkey| *pubkey)
+            .map(|pubkey| pubkey.0)
             .collect::<Vec<[u8; 32]>>();
         rewards_map_keys.sort();
 
         // Append the serialized key-value pairs to the byte vector
         for key in rewards_map_keys {
-            let value = self.rewards.get(&key).unwrap();
+            let value = self.rewards.get(&Pubkey(key)).unwrap();
             bytes.extend(&key);
             bytes.extend(&U64Bytes::from(value).data);
         }

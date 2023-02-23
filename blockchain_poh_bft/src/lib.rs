@@ -4,19 +4,17 @@ pub mod block;
 pub mod blockchain;
 pub mod hashable;
 pub mod transaction;
-pub mod pubkey;
 pub mod app;
 
 pub use crate::{
     block::Block,
     blockchain::Blockchain,
     transaction::Transaction,
-    hashable::Hashable,
-    // pubkey::Pubkey,
+    hashable::{Hashable, Hash, Pubkey, Privatekey},
+    // keys::{Pubkey, Privatekey},
 };
 
-type Hash = Vec<u8>;
-type Pubkey = [u8; 32];
+// type Hash = Vec<u8>;
 type Signature = [u8; 64];
 
 pub fn now() -> u128 {
