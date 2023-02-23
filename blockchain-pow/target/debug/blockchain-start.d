@@ -1,0 +1,1 @@
+/home/jam/workspace/rust/web3/blockchain/blockchain-start/target/debug/blockchain-start: /home/jam/workspace/rust/web3/blockchain/blockchain-start/src/block.rs /home/jam/workspace/rust/web3/blockchain/blockchain-start/src/lib.rs /home/jam/workspace/rust/web3/blockchain/blockchain-start/src/main.rs
