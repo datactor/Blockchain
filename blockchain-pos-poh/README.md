@@ -101,8 +101,8 @@ mint 프로그램은 주로 토큰 생성 및 burnt를 담당하는 반면, Toke
 여기에는 개별 유저의 balance 관리 및 유통 중인 토큰의 총 공급량 추적이 포함된다.
 
 얼핏 보면 mint program과 token program을 나눈 이유가 명확하게 보이지 않을 수 있다.
-개인적인 의견이지만 보이지 않는 손과 같이 macro program을 mint로 두고, 무언가 조정이 필요한 issue가 있을 경우에
-macro를 건드리지 않고 조치할 수 있는 수단을 만들어 토큰을 관리할 때 더 많은 유연성과 사용자 정의를 허용하기 위함으로 보인다.
+개인적인 의견이지만 개입 없이 거시적 유동성 관리를 위해 invisible hand처럼 macro program을 mint로 두고, 무언가 조정이 필요한 issue가 있을 경우에
+macro를 건드리지 않고 조치할 수 있는 수단인 transparent hand를 만들어 토큰을 관리할 때 더 많은 유연성과 사용자 정의를 허용하기 위함으로 보인다.
 
 또한 mint와 token 프로그램을 분리함으로써 개발자는 다양한 type과 properties, func를 가진 토큰을 생성할 수 있으며,
 solana chain에서 다양한 dapp 및 사용을 장려하는 수단인 것 같다.

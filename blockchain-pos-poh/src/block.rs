@@ -10,9 +10,9 @@ pub struct Block {
     // version: u64,
     signature: Signature,
     // fees: u64,
-    slot: u64, // index
+    pub(crate) slot: u64, // index
     // skipped_slots: u64,
-    timestamp: u128,
+    pub(crate) timestamp: u64,
     parent_slot: u64,
 
     // The hash of the root of the transaction merkle tree
@@ -27,7 +27,7 @@ pub struct Block {
     prev_block_hash: Hash,
     pub rewards: HashMap<Pubkey, u64>,
     is_confirmed: bool,
-    hash: Hash,
+    pub(crate) hash: Hash,
     transactions: Vec<Transaction>,
     // transaction_count: u64,
     working_stake: u64,
@@ -51,7 +51,7 @@ impl Block {
     pub fn new(
         signature: Signature,
         slot: u64, // index
-        timestamp: u128,
+        timestamp: u64,
         prev_block_hash: Hash,
         rewards: HashMap<Pubkey, u64>,
         transactions: Vec<Transaction>,
@@ -85,6 +85,14 @@ impl Block {
         self.prev_block_hash = parent_block_hash;
         self.hash = self.finalize();
     }
+
+    pub fn is_valid(&self, difficulty: u64) -> bool {
+        self.update();
+        let hash = self.finalize();
+
+        let hash_bits = hash.0.iter().fold(0, |acc, b| ((acc + b) as u64).count_ones().try_into().unwrap());
+        u64::from(hash_bits)  >= difficulty
+    }
 }
 
 impl Hashable for Block {
@@ -97,7 +105,7 @@ impl Hashable for Block {
         bytes.extend(&self.signature);
         bytes.extend(U64Bytes::from(&self.slot).data);
         bytes.extend(U64Bytes::from(&self.parent_slot).data);
-        bytes.extend(U128Bytes::from(&self.timestamp).data);
+        bytes.extend(U64Bytes::from(&self.timestamp).data);
         bytes.extend(&self.transaction_root.0);
         if self.is_confirmed {
             bytes.push(0x01);

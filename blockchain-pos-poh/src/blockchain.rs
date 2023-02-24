@@ -23,7 +23,7 @@ pub struct Blockchain {
 }
 
 impl Blockchain {
-    pub fn new(genesis: Block) -> Self {
+    pub fn genesis(genesis: Block) -> Self {
         Blockchain {
             blocks: vec![genesis],
             height: 0,

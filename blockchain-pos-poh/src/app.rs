@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 pub fn run() {
     let genesis = spawn_genesis();
-    let genesis_chain = Blockchain::new(genesis.0);
+    let blockchain = Blockchain::genesis(genesis.0);
 
 
 

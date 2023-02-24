@@ -6,6 +6,8 @@ pub mod hashable;
 pub mod transaction;
 pub mod app;
 pub mod account;
+pub mod mint;
+pub mod sys;
 
 pub use crate::{
     block::Block,
