@@ -34,13 +34,11 @@ impl Blockchain {
         chain.push(genesis_block.clone());
 
         // Create a blockchain Instance.
-        let blockchain = Blockchain {
+        Blockchain {
             genesis_block,
             chain,
             difficulty,
-        };
-
-        blockchain
+        }
     }
 
     // - Blockchain의 인스턴스를 받는 함수.

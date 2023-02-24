@@ -1,6 +1,7 @@
 use super::blockchain::Blockchain;
 use chrono::prelude::*;
 use sha2::{Sha256, Digest};
+use sha3::{Keccak256};
 use serde::{Deserialize, Serialize};
 
 // `Block`, A struct that represents a block in a Blockchain.
@@ -20,20 +21,18 @@ pub struct Block {
 
 impl Block {
     // Create a new block. The hash will be calculated and set automatically.
-    pub fn new (
+    pub fn new(
         index: u64,
         previous_hash: String,
     ) -> Self {
         // Current block to be created.
-        let block = Block {
+        Block {
             index,
             timestamp: Utc::now().timestamp_millis() as u64,
             proof_of_work: u64::default(),
             previous_hash,
             hash: String::default(),
-        };
-
-        block
+        }
     }
 
     // Calculate block hash.
