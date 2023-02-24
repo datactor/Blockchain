@@ -28,6 +28,7 @@ impl Sys {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         let mut block = Block::new([0u8; 64], timestamp, 0, self.current_block.hash.clone(), HashMap::new(), vec![], 0, 0, 0);
 
+        // a tiny of PoW. Acts as a spam filter
         while !block.is_valid(0) {
             block.slot += 1;
         }

@@ -90,8 +90,8 @@ impl Block {
         self.update();
         let hash = self.finalize();
 
-        let hash_bits = hash.0.iter().fold(0, |acc, b| ((acc + b) as u64).count_ones().try_into().unwrap());
-        u64::from(hash_bits)  >= difficulty
+        let hash_bits = hash.0.iter().fold(0, |acc, &b| acc + (b as u8).count_ones());
+        u64::from(hash_bits) >= difficulty
     }
 }
 
