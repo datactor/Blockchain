@@ -65,10 +65,51 @@ blockchain이 시작되면 sys program이 메모리에 로드되고 state는 해
 
 ### mint program
 Todo!();
-시스템 내부에
+genesis에서 account 생성, 새로운 Sol token을 생성하는데 사용되며 Mint program에서 관리한다.
+mint의 잔액은 총 sol token수와 직접 관련된다. 모든 solana token은 Mint account를 거쳐서 가기 때문이다.
+solana가 처음 발행되면 mint account로 입금된다. Validator가 block보상을 받을 때 역시 mint로부터 입금되고,
+tx 수수료에서 보상을 제외한 mod 또한 mint account로 입금된다.
+tx에서 필연적으로 mint에게 입금되는 금액은 원금의 Valdator가 원금을 Validating할 때 tx 유효성 검사 및 합의 프로세스의 일부로
+자동으로 발생하므로 validator는 fee를 별도로 확인할 필요가 없고 이부분을 따로 validating하지 않는다(재귀적 validating 방지).
+민트 프로그램에서 mint account로 입금시킬 때는 fee를 부과하거나 validating을 요구하지 않고 진행된다.
+fake tx나 유저가 임의로 mint에 입금시켜 발행량을 조작할 수 없으며, mint program은 유효한 유저의 tx라도 거절할 수 있는 기능이 있다.
+solana의 유동성을 조절하는 역할을 하며 이것을 위해 token을 소각하는 경우에도
+mint account의 balance에서 소각한다.
+(tx에서 fee의 목적지: 1. to validator, 2. mint account, 3. burnt) 
+여기서 주의해야 할점은 mint에서 수행하는 소각은 거시적 유동성 관리목적이긴 하지만 macro liquidity managing으로,
+자동적으로 소각되는 양으로 천천히 수행된다. 숏텀에 급진적으로 유동성을 조절하기 위해 destruct하는 역할은 Token program에서 수행한다.
+
++add)
+1. Token Metadata: Depending on use case, you may want to include additional metadata about the token, such as a name, symbol, or decimal places. This information can be stored in the token account's data field, and can be read by other programs that interact with the token.
+
+2. Token Supply Limit: If I want to set a limit on the total supply of tokens that can be issued. This can be done by setting a maximum supply value when creating the token account.
+
+3. Token Burn: In addition to controlling the token supply by minting.
+
+4. Token Freezing: If I want to implement the ability to freeze certain token accounts. This can be useful for preventing fraudulent or unauthorized use of the token.
+
+5. Token Transfers: Need to implement the logic for transferring tokens between accounts. This includes validating the sender's balance, checking the receiver's account, and updating the account balances.
+
+6. Token Minting Fees: Plan to charge a fee for minting new tokens, I have to implement the logic for calculating and deducting this fee from the minted tokens.
 
 ### token program
 Todo!();
+genesis에서 account 생성, Token program은 토큰의 생성, tx, destruction을 담당한다.
+총 공급량, 개별 유저 잔액 및 토큰 메타데이터를 포함하여 토큰에 대한 정보를 저장하려면 계정이 필요하다.
+mint 프로그램은 주로 토큰 생성 및 burnt를 담당하는 반면, Token program은 유통 중인
+토큰 공급 관리, 토큰 소유권 추적 및 토큰 tx와 관련된 모든 규칙 시행을 담당한다.
+여기에는 개별 유저의 balance 관리 및 유통 중인 토큰의 총 공급량 추적이 포함된다.
+
+얼핏 보면 mint program과 token program을 나눈 이유가 명확하게 보이지 않을 수 있다.
+개인적인 의견이지만 보이지 않는 손과 같이 macro program을 mint로 두고, 무언가 조정이 필요한 issue가 있을 경우에
+macro를 건드리지 않고 조치할 수 있는 수단을 만들어 토큰을 관리할 때 더 많은 유연성과 사용자 정의를 허용하기 위함으로 보인다.
+
+또한 mint와 token 프로그램을 분리함으로써 개발자는 다양한 type과 properties, func를 가진 토큰을 생성할 수 있으며,
+solana chain에서 다양한 dapp 및 사용을 장려하는 수단인 것 같다.
+
+mint program과 토큰 program의 주요 차이점 중 하나는 mint program은 필요에 따라 새 토큰을
+생성하고 burnt에 중점을 둔 역할을 하는 반면 Token program은 유통 중인 토큰을 관리하고 tx가 유효하고 준수되는지 확인하고,
+잔액 및 메타데이터를 포함하여 개별 토큰 자체를 관리하는 역할을 한다는 것이다.
 
 ### stake program
 Todo!();
