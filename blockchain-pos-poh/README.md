@@ -67,7 +67,7 @@ blockchain이 시작되면 sys program이 메모리에 로드되고 state는 해
 Todo!();
 genesis에서 account 생성, 새로운 Sol token을 생성하는데 사용되며 Mint program에서 관리한다.
 mint의 잔액은 총 sol token수와 직접 관련된다. 모든 solana token은 Mint account를 거쳐서 가기 때문이다.
-solana가 처음 발행되면 mint account로 입금된다. Validator가 block보상을 받을 때 역시 mint로부터 입금되고,
+solana가 처음 발행되면 mint account로 입금된다. Validator가 block보상을 받는 것 역시 mint로부터 입금되고,
 tx 수수료에서 보상을 제외한 mod 또한 mint account로 입금된다.
 tx에서 필연적으로 mint에게 입금되는 금액은 원금의 Valdator가 원금을 Validating할 때 tx 유효성 검사 및 합의 프로세스의 일부로
 자동으로 발생하므로 validator는 fee를 별도로 확인할 필요가 없고 이부분을 따로 validating하지 않는다(재귀적 validating 방지).
@@ -76,6 +76,7 @@ fake tx나 유저가 임의로 mint에 입금시켜 발행량을 조작할 수 �
 solana의 유동성을 조절하는 역할을 하며 이것을 위해 token을 소각하는 경우에도
 mint account의 balance에서 소각한다.
 (tx에서 fee의 목적지: 1. to validator, 2. mint account, 3. burnt) 
+
 여기서 주의해야 할점은 mint에서 수행하는 소각은 거시적 유동성 관리목적이긴 하지만 macro liquidity managing으로,
 자동적으로 소각되는 양으로 천천히 수행된다. 숏텀에 급진적으로 유동성을 조절하기 위해 destruct하는 역할은 Token program에서 수행한다.
 

@@ -5,7 +5,32 @@ pub fn run() {
     let genesis = spawn_genesis();
     let blockchain = Blockchain::genesis(genesis.0);
 
-
+    // 1. The validator requests the network to create a block.
+    // 2. The network selects a leader node to create a block.
+    // 3. The leader node, which has the sys program installed ,create a block
+    //    (Enter pubkey in msg. (Open the account db and find the pubkey as the recipient address (account)).
+    // 4. The leader node broadcasts the created block to the network.
+    // 5. The network sends the created block to the validator for verification.
+    // 6. Validators receive the block from the network and perform PoH validation to verify that
+    //    the block was created at a specific time. Multiple validators can verify the same block simultaneously.
+    //    multiple validators can verify the same block simultaneously, which helps ensure that
+    //    the validation process is efficient and decentralized. Each validator runs the PoH validation
+    //    and block validation steps independently, and once a block is verified,
+    //    the validator can sign it and send it back to the network.
+    //    The validators do not need to wait for each other to complete the validation process,
+    //    although they do need to agree on the order in which blocks are added to the blockchain to maintain consensus.
+    // 7. When a validator completes the PoH verification, it further verifies the correctness of the block.
+    //    Verification of correctness includes verifying the signature of each transaction,
+    //    verifying that the transaction is valid and approved (checking that PoH verification
+    //    has been completed and that the block conforms to the protocol rules),
+    //    and checking that the block's hash satisfies the consensus algorithm requirements.
+    //    If all of these are confirmed to be valid, the validator sets the is_confirmed field to true,
+    //    signs the block, and sends it back to the network.
+    // 8. When the network receives a verified block from the validator, it sends the block to the leader node.
+    //    The leader node adds the block to the blockchain and sends the updated blockchain to the network.
+    //    Other nodes in the network receive the updated blockchain and verify that
+    //    it is a valid extension of the existing blockchain. When a blockchain is confirmed,
+    //    it is considered a new valid state of the network.
 
     // let mut tx = Transaction::create(&private_key, &recipient_pubkey, amount, recent_blockhash);
     // tx.sign(&private_key);

@@ -1,8 +1,16 @@
 use super::*;
 
+// leader node가 account db를 조회하지 않고 Pubkey와 balance를 먼저 넣을 방법이 있어야함
+// 1. App client: app 로그인 정보에 pubkey가 나와있음.
+// 2. Cache 사용. 이전에 이용한 적 있던 계정은 state를 저장해둔다(주의 필요), Redis, Memcached같은 분산 캐시 사용.
+// 3. Bloom filter: 간소화된 light account db 추가. light account db를 추가해 자체적 부담을 덜어준다.
+
 #[derive(Clone)]
 pub struct Transaction {
     pub signatures: Vec<Signature>,
+    pub sender: Pubkey,
+    pub recipient: Pubkey,
+    pub amount: u64,
     pub message: Message,
     pub fee: u64,
     pub recent_blockhash: Hash,

@@ -48,6 +48,7 @@ impl Debug for Block {
 }
 
 impl Block {
+    // "constructor arguments should define the object's required state"
     pub fn new(
         signature: Signature,
         slot: u64, // index
