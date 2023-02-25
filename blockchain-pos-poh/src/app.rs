@@ -7,7 +7,6 @@ pub fn run() {
 
 
 
-
     // let mut tx = Transaction::create(&private_key, &recipient_pubkey, amount, recent_blockhash);
     // tx.sign(&private_key);
 
