@@ -1,9 +1,11 @@
 use super::*;
 use std::collections::HashMap;
+use bs58::{decode, encode};
 
 pub fn run() {
     let genesis = spawn_genesis();
     let blockchain = Blockchain::genesis(genesis.0);
+    let account_set = genesis.1;
 
     // 1. The validator requests the network to create a block.
     // 2. The network selects a leader node to create a block.
@@ -34,6 +36,16 @@ pub fn run() {
 
     // let mut tx = Transaction::create(&private_key, &recipient_pubkey, amount, recent_blockhash);
     // tx.sign(&private_key);
+
+    let pubkey = [0u8; 32];
+    let encoded_pubkey = encode(&pubkey).into_string();
+
+    println!("{:?}", pubkey);
+
+    println!("{}", encoded_pubkey);
+
+    let decoded_pubkey: [u8; 32] = decode(&encoded_pubkey).into_vec().unwrap().try_into().unwrap();
+    println!("{:?}", decoded_pubkey);
 
 }
 
@@ -68,13 +80,13 @@ fn spawn_genesis() -> (Block, AccountSet) {
     // 시스템 프로그램에서 솔라나 블록체인의 state 관리
     let sys_pubkey = Pubkey::new_rand();
     let sys_account = Account::new(1, sys_pubkey.clone(), 1, vec![], false, None);
-    accountset.insert_account(sys_pubkey.clone(), sys_account);
+    accountset.insert_account(sys_pubkey, sys_account);
 
     // 필라델피아 민트 동전생산 공장에서 유래. 새로운 SOL 토큰 생성하는데 사용됨. Mint 프로그램에서 관리함.
     // 이 계정의 잔액은 유통되는 총 SOL 토큰 수를 나타냄.
     let mint_pubkey = Pubkey::new_rand();
     let mint_account = Account::new(1_000_000_000_000, mint_pubkey.clone(), 0, vec![], false, None);
-    accountset.insert_account(mint_pubkey.clone(), mint_account);
+    accountset.insert_account(mint_pubkey, mint_account);
 
     // 토큰 계정 및 토큰 전송을 관리하는데 사용되는 토큰 프로그램용 smart contract 코드가 포함되어 있음.
     let token_program_pubkey = Pubkey::new_rand();
@@ -82,22 +94,22 @@ fn spawn_genesis() -> (Block, AccountSet) {
     // 새로 생성할 때도 account에 program이 포함되어 있다면 executable: true. smart contract는 프로그램으로 구현되어 있어,
     // account에 load되고 blockchain에서 실행될 수 있음을 나타낸다. smart contract 외에도
     // 블록체인에서 account에 load되고 실행되는 다른 type의 프로그램이 있을 수 있다. 이 경우도 executable field가 true로 생성됨.
-    accountset.insert_account(token_program_pubkey.clone(), token_program_account);
+    accountset.insert_account(token_program_pubkey, token_program_account);
 
     // 솔라나 체인의 rent-exempt reserve 관리 Rent 프로그램용 account
     let rent_sysvar_pubkey = Pubkey::new_rand();
     let rent_sysvar_account = Account::new(0, rent_sysvar_pubkey.clone(), 0, vec![], false, None);
-    accountset.insert_account(rent_sysvar_pubkey.clone(), rent_sysvar_account);
+    accountset.insert_account(rent_sysvar_pubkey, rent_sysvar_account);
 
     // stake 프로그램에서 stake 계정 및 staking 활동 기록을 유지하는 account
     let stake_history_pubkey = Pubkey::new_rand();
     let stake_history_account = Account::new(0, stake_history_pubkey.clone(), 0, vec![], false, None);
-    accountset.insert_account(stake_history_pubkey.clone(), stake_history_account);
+    accountset.insert_account(stake_history_pubkey, stake_history_account);
 
     // stake 프로그램에서 staking하기 위한 config parameter를 저장하는데 사용되는 account
     let stake_config_sysvar_pubkey = Pubkey::new_rand();
     let stake_config_sysvar_account = Account::new(0, stake_config_sysvar_pubkey.clone(), 0, vec![], false, None);
-    accountset.insert_account(stake_config_sysvar_pubkey.clone(), stake_config_sysvar_account);
+    accountset.insert_account(stake_config_sysvar_pubkey, stake_config_sysvar_account);
 
     (genesis, accountset)
 }

@@ -63,7 +63,7 @@ impl Block {
     ) -> Self {
         Block {
             signature,
-            slot: 0,
+            slot,
             parent_slot: 0,
             timestamp,
             transaction_root: Hash([0; 32]),
@@ -91,7 +91,7 @@ impl Block {
         self.update();
         let hash = self.finalize();
 
-        let hash_bits = hash.0.iter().fold(0, |acc, &b| acc + (b as u8).count_ones());
+        let hash_bits = hash.0.iter().fold(0, |acc, &b| acc + b.count_ones());
         u64::from(hash_bits) >= difficulty
     }
 }

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 /// 솔라나의 블록체인에서 validator는 한 번에 단일 블록(single timestamped event)의 내용에
 /// 동의(validation and confirmation)하므로 validator가 동의하는 데 필요한 시간을 최소화 할 수 있다.
 ///
-/// 여기서 PoH라는 프로세스를 사용한다. PoH에서 validator는 네트워크의 cryptographic clock 역할을 하는
+/// 여기서 PoH 프로세스를 사용한다. PoH에서 validator는 네트워크의 cryptographic clock 역할을 하는
 /// 단일 historical value에 대한 consensus에 도달한다. 이렇게 하면 모든 validator가 블록이 체인에
 /// 추가되는 시간에 동의할 수 있다.
 /// 이더리움이나 비트코인도 한 번에 단일 블록의 내용에 validation and confirmation 한다는 것은 동일하지만,

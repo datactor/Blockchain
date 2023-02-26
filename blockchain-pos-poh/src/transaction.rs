@@ -5,6 +5,13 @@ use super::*;
 // 2. Cache 사용. 이전에 이용한 적 있던 계정은 state를 저장해둔다(주의 필요), Redis, Memcached같은 분산 캐시 사용.
 // 3. Bloom filter: 간소화된 light account db 추가. light account db를 추가해 자체적 부담을 덜어준다.
 
+// 또는 잠재적 성능 향상 요소
+// 1. pre-fetching: tx가 제출되기 기다리지 않고, leader node들은 tx를 예상해 account db를 가져와 메모리에 올려 놓는다.
+// 2. parallel processing: multi-processing, 또는 distributed computing을 사용해 tx를 병렬처리하기
+// 3. client측 caching: leader node에 의존하여 account db를 조회하는 대신 client는 accountset을 캐싱할 수 있음.
+// 4. opt-accountDB: 더 효율적인 데이터 구조사용, 인덱스 수 감소, 확장성 향상을 위한 분산 데이터베이스 사용
+// 5. Offloading to specialized hardware: FPGA 또는 ASIC 같은 특수 하드웨어로 account data 처리를 오프로딩.
+
 #[derive(Clone)]
 pub struct Transaction {
     pub signatures: Vec<Signature>,
@@ -18,12 +25,18 @@ pub struct Transaction {
 
 impl Transaction {
     pub fn new(signatures: Vec<Signature>,
+               sender: Pubkey,
+               recipient: Pubkey,
+               amount: u64,
                message: Message,
                fee: u64,
                recent_blockhash: Hash)
         -> Self {
         Self {
             signatures,
+            sender,
+            recipient,
+            amount,
             message,
             fee,
             recent_blockhash,
