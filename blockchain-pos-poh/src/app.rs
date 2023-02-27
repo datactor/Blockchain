@@ -5,7 +5,10 @@ use bs58::{decode, encode};
 pub fn run() {
     let genesis = spawn_genesis();
     let blockchain = Blockchain::genesis(genesis.0);
-    let account_set = genesis.1;
+    let account_set = genesis.1.clone();
+
+    let x = Privatekey::new();
+    println!("{:?}", x);
 
     // 1. The validator requests the network to create a block.
     // 2. The network selects a leader node to create a block.
@@ -36,6 +39,8 @@ pub fn run() {
 
     // let mut tx = Transaction::create(&private_key, &recipient_pubkey, amount, recent_blockhash);
     // tx.sign(&private_key);
+
+    interpreter(blockchain, account_set);
 
     let pubkey = [0u8; 32];
     let encoded_pubkey = encode(&pubkey).into_string();

@@ -1,6 +1,8 @@
 use super::*;
 use rand::{rngs::OsRng, RngCore, Rng};
+// Edwards-curve(EdDSA(Elliptic Curve Digital Signature Algorithm))도 determinism을 엄격하게 준수한다.
 use ring::signature::{Ed25519KeyPair, KeyPair};
+use bs58::{decode, encode};
 
 // SHA256의 digest는 언제나 256bit [u8; 32]를 반환한다.
 // 만약 [u8; 128]을 입력으로 둔다면 중복되는 값이 존재하여 충돌하지 않을까?
@@ -64,6 +66,10 @@ impl Privatekey {
         let mut seed = [0u8; 32];
         rng.fill_bytes(&mut seed);
         let keypair = Ed25519KeyPair::from_seed_unchecked(&seed).unwrap();
+        // 솔라나는 keypair로 입력함. seed를 hashing한 친화적이진 않지만 익숙한 String type으로도 키를 배포하지 않음.
+        // 왜? 키패어를 사용하면 유저가 키패어를 분실했을 때, 니모닉으로 찾을 수 있는 옵션을 넣을 여지가 존재함.
+        // 그렇지만 seed를 해싱한 값만 가지고 지갑 복구에 단일 실패지점을 두는 것은 영구적으로 지갑을 잃을 수 있음.
+
         Privatekey(keypair)
     }
 

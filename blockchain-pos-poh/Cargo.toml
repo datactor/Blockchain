@@ -21,4 +21,3 @@ serde = "1.0.152"
 rand = "0.8.5"
 ring = "0.16.20"
 bs58 = "0.4.0"
-clap = { version = "4.1.6", features = ["derive"] }

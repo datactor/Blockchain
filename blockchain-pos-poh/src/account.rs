@@ -27,6 +27,7 @@ impl Account {
 
 // AccountSet must be stored in its own db server(it called ledger).
 // The ledger is maintained by the validators in the network, who store and update the ledger on their own servers.
+#[derive(Clone)]
 pub struct AccountSet {
     accounts: HashMap<Pubkey, Account>,
 }

@@ -9,6 +9,7 @@ pub mod account;
 pub mod mint;
 pub mod sys;
 pub mod configmap;
+pub mod repl;
 
 pub use crate::{
     block::Block,
@@ -16,7 +17,8 @@ pub use crate::{
     transaction::Transaction,
     hashable::{Hashable, Hash, Pubkey, Privatekey},
     account::{Account, AccountSet},
-    configmap::{cli, },
+    configmap::{cli, db},
+    repl::interpreter,
 };
 
 type Signature = [u8; 64];
