@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use super::*;
 use rand::{rngs::OsRng, RngCore, Rng};
 // Edwards-curve(EdDSA(Elliptic Curve Digital Signature Algorithm))도 determinism을 엄격하게 준수한다.
@@ -69,6 +70,20 @@ impl Privatekey {
         // 솔라나는 keypair로 입력함. seed를 hashing한 친화적이진 않지만 익숙한 String type으로도 키를 배포하지 않음.
         // 왜? 키패어를 사용하면 유저가 키패어를 분실했을 때, 니모닉으로 찾을 수 있는 옵션을 넣을 여지가 존재함.
         // 그렇지만 seed를 해싱한 값만 가지고 지갑 복구에 단일 실패지점을 두는 것은 영구적으로 지갑을 잃을 수 있음.
+        let mut privatekey_once = seed.to_vec();
+        let public_keys = keypair.public_key().as_ref().to_owned();
+        for i in public_keys {
+            privatekey_once.push(i);
+        }
+        let once: [u8; 64] = privatekey_once.try_into().unwrap();
+
+        println!("\n\
+                  Do not disclose this key to anyone and store it in a safe place. It is not stored anywhere.\n\
+                  \n\
+                  keypair: \n\
+                  {:?}\n\
+                  ", once);
+        once.to_vec().clear();
 
         Privatekey(keypair)
     }

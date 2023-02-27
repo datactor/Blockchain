@@ -15,7 +15,7 @@ use std::collections::HashMap;
 /// 또한 1차원 구조는 데이터 모델을 단순화하여 구현,
 /// 테스트 및 추론을 더 쉽게 만든다. 또한 더 복잡한 데이터 모델의 여러 체인이 아니라
 /// 동기화할 블록의 단일 체인이 있기 때문에 노드 간에 1차원 블록체인을 동기화하는 것이 더 쉬울 수 있다.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Blockchain {
     pub blocks: Vec<Block>,
     pub height: u64,

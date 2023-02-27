@@ -7,8 +7,8 @@ pub fn run() {
     let blockchain = Blockchain::genesis(genesis.0);
     let account_set = genesis.1.clone();
 
-    let x = Privatekey::new();
-    println!("{:?}", x);
+    // let x = Privatekey::new();
+    // println!("{:?}", x);
 
     // 1. The validator requests the network to create a block.
     // 2. The network selects a leader node to create a block.
