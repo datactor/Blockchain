@@ -18,7 +18,7 @@ pub use crate::{
     hashable::{Hashable, Hash, Pubkey, Privatekey},
     account::{Account, AccountSet},
     configmap::{cli, db},
-    repl::interpreter,
+    repl::login_menu_main,
 };
 
 type Signature = [u8; 64];
