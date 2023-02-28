@@ -8,7 +8,7 @@ use std::{
 };
 use bs58::{decode, encode};
 use ring::signature::{Ed25519KeyPair, KeyPair};
-use rand::{Rng, thread_rng};
+use rand::{Rng, thread_rng, rngs::OsRng};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum Error {
@@ -78,42 +78,47 @@ pub fn login_menu_main(mut accountset: AccountSet) {
 }
 
 fn create_new_wallet(mut accountset: AccountSet) -> Result<(), Error> {
-    let mut rng = thread_rng();
-    let rand_num = rng.gen_range(100_000_000_000..1_000_000_000_000);
+    // thread_rng() vs OsRng?
+    // OsRng는 OS별 메서드를 사용해 안전하고 예측할 수 없도록 설계된 난수를 사용한다.
+    // thread_rng는 범용 사례에 적합한 단순한 난수 생성기이지만 민감한 응용프로그램에 대해 암호학적으로는
+    // 안전을 보증하지는 못함.
+    // 즉 OsRng는 보다 암호화 응용프로그램에 더 적합하다.
+    // 그렇지만 humancheck 수단에 있어서는 암호화 목적으로 사용하지 않기 때문에 OsRng를 사용할 필요는 없다.
 
     let mut is_human: Option<bool> = None;
 
     for i in 0..5 {
-        println!("Type this 12 digit number: {} ({}/5)", rand_num, 5-i);
+        let rand_num = thread_rng().gen_range(100_000_000_000..1_000_000_000_000);
+        println!("Type this 12 digit number: {} ({}/5)", rand_num, 5 - i);
         match input::<usize>() {
-            Ok(n) => {
-                if n == rand_num {
-                    is_human = Some(true);
-                    println!("Identified");
-                    break
-                } else {
-                    println!("Wrong number. try again");
-                    continue
-                }
-            },
-            Err(_) => continue
+            Ok(n) if n == rand_num => {
+                is_human = Some(true);
+                println!("Identified");
+                break;
+            }
+            Ok(_) => println!("Wrong number. try again"),
+            Err(_) => {},
         }
     }
 
-    if is_human.is_none() || is_human.unwrap() == false {
+    if let Some(false) | None = is_human {
         println!("Identification failed. Returning to main menu.");
-        return Err(Error::HumanIdentificationError)
+        return Err(Error::HumanIdentificationError);
+    }
+
+    if let Some(false) = is_human {
+        println!("Identification failed. Returning to main menu.");
+        return Err(Error::HumanIdentificationError);
     }
 
     let new_private = Privatekey::new();
-
-    let new_account = Account::new(0, new_private.pubkey(), 0, vec![], false, Some(new_private.sign(&[0u8; 32])));
 
     for i in 0..5 {
         println!("({}/5) Would you like to register this wallet? (y/n)", 5-i);
         let input = input::<String>()?;
         match input.as_ref() {
             "y" => {
+                let new_account = Account::new(0, new_private.pubkey(), 0, vec![], false, Some(new_private.sign(&[0u8; 32])));
                 accountset.insert_account(new_private.pubkey(), new_account);
                 println!("The wallet has been successfully registered");
                 return Ok(())
@@ -187,7 +192,10 @@ fn login(mut accountset: AccountSet) -> Result<(), Error> {
     }
 }
 
-fn input<T: FromStr>() -> Result<T, Error> where <T as FromStr>::Err: Debug {
+fn input<T: FromStr>() -> Result<T, Error>
+    where
+        <T as FromStr>::Err: Debug,
+{
     let mut input = String::new();
     print!(">>> ");
     io::stdout().flush().expect("Failed to flush stdout");
@@ -195,8 +203,8 @@ fn input<T: FromStr>() -> Result<T, Error> where <T as FromStr>::Err: Debug {
     match input.trim().parse::<T>() {
         Ok(val) => Ok(val),
         Err(err) => {
-            println!("Error: {:?}\n\
-            Please enter a valid value", err);
+            println!("{:?}\nError: {:?}\n\
+            Please enter a valid value", input.trim(), err);
             Err(Error::ParseError)
         },
     }
