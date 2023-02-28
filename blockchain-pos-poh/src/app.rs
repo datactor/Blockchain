@@ -40,7 +40,7 @@ pub fn run() {
     // let mut tx = Transaction::create(&private_key, &recipient_pubkey, amount, recent_blockhash);
     // tx.sign(&private_key);
 
-    login_menu_main(account_set);
+    login_menu_main(&account_set);
 
     let pubkey = [0u8; 32];
     let encoded_pubkey = encode(&pubkey).into_string();

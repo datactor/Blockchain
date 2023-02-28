@@ -17,6 +17,7 @@ enum Error {
     KeypairError,
     InvalidConversionError,
     HumanIdentificationError,
+    BackToPrevious,
 }
 
 impl std::fmt::Display for Error {
@@ -26,14 +27,15 @@ impl std::fmt::Display for Error {
             Error::ParseIntError => write!(f, "Error parsing int input"),
             Error::KeypairError => write!(f, "Error creating keypair"),
             Error::InvalidConversionError => write!(f, "Error converting data to a different type"),
-            Error::HumanIdentificationError => write!(f, "Error checking robot"),
+            Error::HumanIdentificationError => write!(f, "Error identified to be non-robot"),
+            Error::BackToPrevious => write!(f, "Back to previous"),
         }
     }
 }
 
 // impl std::error::Error for Error {}
 
-pub fn login_menu_main(mut accountset: AccountSet) {
+pub fn login_menu_main(accountset: &AccountSet) {
     let args: Vec<String> = env::args().collect();
 
     if args.len() > 1 {
@@ -59,12 +61,12 @@ pub fn login_menu_main(mut accountset: AccountSet) {
                     0 => break, // exit program
                     1 => {
                         println!("log in\n");
-                        login(accountset.clone()).expect("Failed to login");
+                        result_wrapper(login(accountset));
                         continue
                     },
                     2 => {
                         println!("create new wallet\n");
-                        create_new_wallet(accountset.clone()).expect("Failed to create wallet");
+                        result_wrapper(create_new_wallet(accountset));
                     },
                     _ => {
                         println!("Please enter a valid number (0 - 2)\n");
@@ -77,7 +79,7 @@ pub fn login_menu_main(mut accountset: AccountSet) {
     }
 }
 
-fn create_new_wallet(mut accountset: AccountSet) -> Result<(), Error> {
+fn create_new_wallet(accountset: &AccountSet) -> Result<Account, Error> {
     // thread_rng() vs OsRng?
     // OsRng는 OS별 메서드를 사용해 안전하고 예측할 수 없도록 설계된 난수를 사용한다.
     // thread_rng는 범용 사례에 적합한 단순한 난수 생성기이지만 민감한 응용프로그램에 대해 암호학적으로는
@@ -106,12 +108,12 @@ fn create_new_wallet(mut accountset: AccountSet) -> Result<(), Error> {
         return Err(Error::HumanIdentificationError);
     }
 
-    if let Some(false) = is_human {
-        println!("Identification failed. Returning to main menu.");
-        return Err(Error::HumanIdentificationError);
-    }
-
-    let new_private = Privatekey::new();
+    let new_private = loop {
+        let tmp_key = Privatekey::new();
+        if accountset.get_account(&tmp_key.pubkey()).is_none() {
+            break tmp_key
+        }
+    };
 
     for i in 0..5 {
         println!("({}/5) Would you like to register this wallet? (y/n)", 5-i);
@@ -119,13 +121,13 @@ fn create_new_wallet(mut accountset: AccountSet) -> Result<(), Error> {
         match input.as_ref() {
             "y" => {
                 let new_account = Account::new(0, new_private.pubkey(), 0, vec![], false, Some(new_private.sign(&[0u8; 32])));
-                accountset.insert_account(new_private.pubkey(), new_account);
+                // accountset.insert_account(new_private.pubkey(), new_account);
                 println!("The wallet has been successfully registered");
-                return Ok(())
+                return Ok(new_account)
             },
             "n" => {
                 println!("Creation canceled. Return to the previous menu.");
-                return Ok(())
+                return Err(Error::BackToPrevious)
             },
             _ => continue
         }
@@ -134,7 +136,7 @@ fn create_new_wallet(mut accountset: AccountSet) -> Result<(), Error> {
     Err(Error::InvalidConversionError)
 }
 
-fn login(mut accountset: AccountSet) -> Result<(), Error> {
+fn login(accountset: &AccountSet) -> Result<Account, Error> {
     println!("\n\
              Please input your private key.\n\
              or Enter 0 if you want to go back");
@@ -143,7 +145,7 @@ fn login(mut accountset: AccountSet) -> Result<(), Error> {
             Ok(n) => {
                 if n == "0".to_string() {
                     println!("Back to main menu\n");
-                    return Ok(());
+                    return Err(Error::BackToPrevious);
                 } else {
                     let mut input_keypair = n.replace(" ", "");
                     input_keypair = input_keypair.replace("\n", "");
@@ -181,7 +183,7 @@ fn login(mut accountset: AccountSet) -> Result<(), Error> {
 
                     if let Some(pubkey) = accountset.get_account(&Pubkey(keypair_array)) {
                         println!("log in success");
-                        return Ok(());
+                        return Ok(pubkey.clone());
                     } else {
                         println!("This keypair does not exist.")
                     }
@@ -207,5 +209,15 @@ fn input<T: FromStr>() -> Result<T, Error>
             Please enter a valid value", input.trim(), err);
             Err(Error::ParseError)
         },
+    }
+}
+
+fn result_wrapper<T>(result: Result<T, Error>) -> Option<T> {
+    match result {
+        Ok(value) => Some(value),
+        Err(err) => {
+            println!("Back to main: {}", err);
+            None
+        }
     }
 }
