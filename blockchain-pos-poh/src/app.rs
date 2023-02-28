@@ -89,7 +89,8 @@ fn spawn_genesis() -> (Block, AccountSet) {
 
     // 필라델피아 민트 동전생산 공장에서 유래. 새로운 SOL 토큰 생성하는데 사용됨. Mint 프로그램에서 관리함.
     // 이 계정의 잔액은 유통되는 총 SOL 토큰 수를 나타냄.
-    let mint_pubkey = Pubkey::new_rand();
+    let mint_privatekey = Privatekey::new();
+    let mint_pubkey = mint_privatekey.pubkey();
     let mint_account = Account::new(1_000_000_000_000, mint_pubkey.clone(), 0, vec![], false, None);
     accountset.insert_account(mint_pubkey, mint_account);
 

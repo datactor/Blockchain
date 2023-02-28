@@ -1,13 +1,11 @@
 use super::*;
 use std::{
-    io::{
-        self, prelude::*,
-    },
+    io::{self, prelude::*, },
     env,
-    // error::Error,
+    fmt::Debug,
+    str::FromStr,
+
 };
-use std::any::Any;
-use std::num::ParseIntError;
 use bs58::{decode, encode};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use rand::{Rng, thread_rng};
@@ -15,15 +13,27 @@ use rand::{Rng, thread_rng};
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum Error {
     ParseError,
+    ParseIntError,
     KeypairError,
 }
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Error::ParseError => write!(f, "Error parsing input"),
+            Error::ParseIntError => write!(f, "Error parsing int input"),
+            Error::KeypairError => write!(f, "Error creating keypair"),
+        }
+    }
+}
+
+// impl std::error::Error for Error {}
 
 pub fn interpreter(mut blockchain: Blockchain, mut accountset: AccountSet) {
     let args: Vec<String> = env::args().collect();
 
     if args.len() > 1 {
         // Handle command line arguments if any
-        // ...
         println!("Arguments will be implemented later. Please run it without entering any arguments.")
     } else {
         // Start REPL
@@ -40,43 +50,25 @@ pub fn interpreter(mut blockchain: Blockchain, mut accountset: AccountSet) {
                   0: quit this program\n\
                   ");
 
-            let mut first_cmd = input::<usize>();
-            match first_cmd {
-                Ok(_) => {},
-                Err(_) => {
-                    println!("Please enter a valid value");
-                    continue
-                }
-            }
-
-            match first_cmd.unwrap() {
-                1 => println!("log in"),
-                2 => {
-                    println!("create new wallet");
-                    create_new_wallet(accountset.clone())
+            match input::<usize>() {
+                Ok(n) => match n {
+                    0 => break, // exit program
+                    1 => {
+                        println!("log in\n");
+                        login(accountset.clone());
+                        continue
+                    },
+                    2 => {
+                        println!("create new wallet\n");
+                        create_new_wallet(accountset.clone())
+                    },
+                    _ => {
+                        println!("Please enter a valid number (0 - 2)\n");
+                        continue
+                    },
                 },
-                0 => {
-                    println!("quit");
-                    break
-                },
-                _ => {
-                    println!("Please enter a valid number (0 - 2)");
-                    continue
-                }
+                Err(_) => continue
             }
-        }
-    }
-}
-
-#[derive(Debug)]
-struct ParseError {
-    message: String,
-}
-
-impl ParseError {
-    fn new(message: &str) -> Self {
-        ParseError {
-            message: message.to_string(),
         }
     }
 }
@@ -87,10 +79,9 @@ fn create_new_wallet(mut accountset: AccountSet) {
 
     let mut is_human = false;
 
-    for _ in 0..5 {
-        println!("Type this number: {}", rand_num);
-        let input = input::<usize>();
-        match input {
+    for i in 0..5 {
+        println!("Type this 10 digit number: {} ({}/5)", rand_num, 5-i);
+        match input::<usize>() {
             Ok(n) => {
                 if n == rand_num {
                     is_human = true;
@@ -101,180 +92,99 @@ fn create_new_wallet(mut accountset: AccountSet) {
                     continue
                 }
             },
-            Err(_) => {
-                println!("Please enter a valid value");
-                continue
-            }
+            Err(_) => continue
         }
     }
 
     if !is_human {
-        println!("Not identified. Return to previous procedure.");
+        println!("Identification failed. Returning to previous procedure.");
         return
     }
-
-    println!("hello human");
-
 
     let new_private = Privatekey::new();
 
     let new_account = Account::new(0, new_private.pubkey(), 0, vec![], false, Some(new_private.sign(&[0u8; 32])));
 
-    for _ in 0..5 {
-        println!("Would you like to register this wallet?\n\
-         y/n?");
-        let input = input::<String>();
-        match input.clone() {
-            Ok(n) => {
-                if n == "y" {
-                    accountset.insert_account(new_private.pubkey(), new_account);
-                    println!("The wallet has been successfully registered");
-                    break
-                } else if n == "n" {
-                    println!("Creation cancelled. Return to the previous menu.");
-                    break
-                } else {
+    for i in 0..5 {
+        println!("({}/5) Would you like to register this wallet? (y/n)", 5-i);
+        let input = input::<String>().expect("Failed to read input");
+        match input.as_ref() {
+            "y" => {
+                accountset.insert_account(new_private.pubkey(), new_account);
+                println!("The wallet has been successfully registered");
+                break;
+            },
+            "n" => {
+                println!("Creation canceled. Return to the previous menu.");
+                break;
+            },
+            _ => continue
+        }
+    }
+}
 
+fn login(mut accountset: AccountSet) {
+    println!("\n\
+             Please input your private key.\n\
+             or Enter 0 if you want to go back");
+    loop {
+        match input::<String>() {
+            Ok(n) => {
+                if n == "0".to_string() {
+                    println!("Back to main menu\n");
+                    return
+                } else {
+                    let mut input_keypair = n.replace(" ", "");
+                    input_keypair = input_keypair.replace("\n", "");
+                    let mut input_keypair = input_keypair.strip_prefix("[").unwrap_or(&*input_keypair);
+                    input_keypair = input_keypair.strip_suffix("]").unwrap_or(input_keypair);
+                    let keypair_bytes_result: Result<Vec<u8>, Error> = input_keypair
+                        .split(',')
+                        .map(|s| s.trim().parse::<u8>().map_err(|_| Error::ParseIntError))
+                        .collect::<Result<Vec<u8>, Error>>();
+                    let keypair_vec = match keypair_bytes_result {
+                        Ok(bytes) => {
+                            if bytes.len() != 64 {
+                                println!("Error: Invalid keypair length\n\
+                                Please input corret keypair\n\
+                                or Enter 0 if you want to go back\n");
+                                continue
+                            }
+                            bytes
+                        },
+                        Err(err) => {
+                            println!("Error: {:?}\n\
+                            Please input corret keypair\n\
+                            or Enter 0 if you want to go back\n", err);
+                            continue
+                        }
+                    };
+
+                    println!("{:?}", keypair_vec);
+                    let keypair_array: [u8; 32] = (32..64).map(|i| keypair_vec[i]).collect::<Vec<u8>>().try_into().unwrap();
+                    if let Some(pubkey) = accountset.get_account(&Pubkey(keypair_array)) {
+                        println!("log in success");
+                    } else {
+                        println!("This keypair does not exist.")
+                    }
                 }
             },
-            Err(_) => {
-                println!("Please enter a valid value");
-                continue
-            }
+            Err(_) => continue
         }
     }
-
-
-
-
 }
 
-fn start(mut blockchain: Blockchain, mut accountset: AccountSet) {
-    println!("\n\
-                  1: log in\n\
-                  2: create a new wallet\n\
-                  0: quit this program\n\
-                  ");
-
-    let mut input = input::<usize>();
-
-    let mut login_cmd;
-    if let Ok(n) = input {
-        login_cmd = n;
-    } else {
-        println!("Please input valid number");
-        return
-    };
-    // let mut login_cmd;
-    // if let Ok(n) = input.trim().parse::<usize>() {
-    //     login_cmd = n;
-    // } else {
-    //     println!("Please input valid number");
-    //     return
-    // };
-    match login_cmd {
-        0 => {
-            return
-        }
-        1 => {
-            println!("log in");
-            let mut input = String::new();
-            println!("\n\
-                             Please input your private key.\n\
-                             or Enter 0 if you want to go back");
-            print!(">>> ");
-            io::stdout().flush().expect("Failed to flush stdout");
-            io::stdin().read_line(&mut input).expect("Failed to read line");
-            let input_keypair = input.trim().replace(" ", "");
-            let input_keypair = input_keypair.strip_prefix("[").unwrap_or(&*input_keypair);
-            let input_keypair = input_keypair.strip_suffix("]").unwrap_or(input_keypair);
-            let keypair_bytes_result: Result<Vec<u8>, ParseIntError> = input_keypair
-                .split(',')
-                .map(|s| s.trim().parse())
-                .collect::<Result<Vec<u8>, ParseIntError>>();
-            let keypair_vec = match keypair_bytes_result {
-                Ok(bytes) => {
-                    if bytes.len() != 64 {
-                        println!("Error: Invalid keypair length");
-                        return;
-                    }
-                    bytes
-                },
-                Err(err) => {
-                    println!("Error: {}", err);
-                    return;
-                }
-            };
-            println!("{:?}", keypair_vec);
-            let keypair_array: [u8; 32] = (32..64).map(|i| keypair_vec[i]).collect::<Vec<u8>>().try_into().unwrap();
-            if let Some(pubkey) = accountset.get_account(&Pubkey(keypair_array)) {
-                println!("log in success");
-            } else {
-                println!("This keypair does not exist.")
-            }
-        },
-        2 => {
-            println!("sign up");
-            // println!("log in");
-            // input.clear();
-            // println!("\n\
-            //                  Please input your private key.\n\
-            //                  or Enter 0 if you want to go back");
-            // print!(">>> ");
-            // io::stdout().flush().expect("Failed to flush stdout");
-            // io::stdin().read_line(&mut input).expect("Failed to read line");
-            // let input_keypair = input.trim().replace(" ", "");
-            // let input_keypair = input_keypair.strip_prefix("[").unwrap_or(&*input_keypair);
-            // let input_keypair = input_keypair.strip_suffix("]").unwrap_or(input_keypair);
-            // let keypair_bytes_result: Result<Vec<u8>, ParseIntError> = input_keypair
-            //     .split(',')
-            //     .map(|s| s.trim().parse())
-            //     .collect::<Result<Vec<u8>, ParseIntError>>();
-            // let keypair_vec = match keypair_bytes_result {
-            //     Ok(bytes) => {
-            //         if bytes.len() != 64 {
-            //             println!("Error: Invalid keypair length");
-            //             return;
-            //         }
-            //         bytes
-            //     },
-            //     Err(err) => {
-            //         println!("Error: {}", err);
-            //         return;
-            //     }
-            // };
-            // println!("{:?}", keypair_vec);
-            // let keypair_array: [u8; 32] = (32..64).map(|i| keypair_vec[i]).collect::<Vec<u8>>().try_into().unwrap();
-            // if let Some(pubkey) = accountset.get_account(&Pubkey(keypair_array)) {
-            //     println!("log in success");
-            // } else {
-            //     println!("This keypair does not exist.")
-            // }
-        },
-        // "balance" => {
-        //     // Handle balance inquiry logic
-        //     // ...
-        // },
-        // "send" => {
-        //     // Handle send transaction logic
-        //     // ...
-        // },
-        _ => {
-            println!("Unknown command: {}", login_cmd);
-        },
-    }
-
-}
-
-
-fn input<T: std::str::FromStr>() -> Result<T, Error> {
+fn input<T: FromStr>() -> Result<T, Error> where <T as FromStr>::Err: Debug {
     let mut input = String::new();
     print!(">>> ");
     io::stdout().flush().expect("Failed to flush stdout");
     io::stdin().read_line(&mut input).expect("Failed to read line");
-    let trimmed_input = input.trim();
-    match trimmed_input.parse::<T>() {
+    match input.trim().parse::<T>() {
         Ok(val) => Ok(val),
-        Err(_) => Err(Error::ParseError),
+        Err(err) => {
+            println!("Error: {:?}\n\
+            Please enter a valid value", err);
+            Err(Error::ParseError)
+        },
     }
 }
