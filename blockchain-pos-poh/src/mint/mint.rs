@@ -20,9 +20,9 @@ impl Mint {
     }
 
     pub fn mint(&mut self, recipient: Pubkey, amount: u64) {
-        // Mint new tokens to the recipient
+        // Mint new tokens to mint's account by increasing total supply(mint balance).
+        // The added supply will be managed by the token.
         self.total_supply += amount;
-        // TODO: Update recipient balance
     }
 
     pub fn burn(&mut self, amount: u64) {

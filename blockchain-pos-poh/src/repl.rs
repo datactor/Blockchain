@@ -26,8 +26,8 @@ impl std::fmt::Display for Error {
             Error::ParseError => write!(f, "Error parsing input"),
             Error::ParseIntError => write!(f, "Error parsing int input"),
             Error::KeypairError => write!(f, "Error creating keypair"),
-            Error::InvalidConversionError => write!(f, "Error converting data to a different type"),
-            Error::HumanIdentificationError => write!(f, "Error identified to be non-robot"),
+            Error::InvalidConversionError => write!(f, "Error invalid phrase"),
+            Error::HumanIdentificationError => write!(f, "Error identifying non-robot"),
             Error::BackToPrevious => write!(f, "Back to previous"),
         }
     }
@@ -35,8 +35,9 @@ impl std::fmt::Display for Error {
 
 // impl std::error::Error for Error {}
 
-pub fn login_menu_main(accountset: &AccountSet) {
+pub fn login_menu_main(accountset: &mut AccountSet) {
     let args: Vec<String> = env::args().collect();
+    let mut accountset = accountset;
 
     if args.len() > 1 {
         // Handle command line arguments if any
@@ -61,11 +62,19 @@ pub fn login_menu_main(accountset: &AccountSet) {
                     0 => break, // exit program
                     1 => {
                         println!("log in\n");
-                        result_wrapper(login(accountset));
+                        // let account = result_wrapper(login(accountset));
+                        if let Some(account) = result_wrapper(login(accountset)) {
+                            accountset.insert_account(account.owner.clone(), account.clone());
+                            action_menu(account, accountset)
+                        }
                     },
                     2 => {
                         println!("create new wallet\n");
-                        result_wrapper(create_new_wallet(accountset));
+                        // let account = result_wrapper(create_new_wallet(accountset));
+                        if let Some(account) = result_wrapper(create_new_wallet(accountset)) {
+                            accountset.insert_account(account.owner.clone(), account.clone());
+                            action_menu(account, accountset)
+                        }
                     },
                     _ => {
                         println!("Please enter a valid number (0 - 2)\n");
@@ -76,6 +85,37 @@ pub fn login_menu_main(accountset: &AccountSet) {
             }
         }
     }
+}
+
+fn action_menu(account: Account, accountset: &mut AccountSet) {
+    println!("action menu");
+
+    loop {
+        println!("\n\
+                 1: Transfer\n\
+                 2: balance\n\
+                 0: back to main menu\n\
+                 ");
+
+        match input::<usize>() {
+            Ok(n) => match n {
+                0 => break,
+                1 => {
+                    println!("Transaction\n");
+                },
+                2 => {
+                    println!("Balance\n");
+                    // account.
+                },
+                _ => {
+                    println!("Please enter a valid number (0 - 2)\n");
+                    continue
+                },
+            },
+            Err(_) => continue
+        }
+    }
+
 }
 
 fn create_new_wallet(accountset: &AccountSet) -> Result<Account, Error> {

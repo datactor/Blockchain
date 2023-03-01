@@ -70,11 +70,11 @@ The CLI configuration file is used to configure the Solana command-line interfac
 
 ## Programs
 ### sys program
-시스템 내부에 account가 있으며, 블록체인 업데이트에 사용된다.
+시스템 내부에 account가 있으며, 블록체인 업데이트에 및 가장 로우 레벨인 프로그램 계정을 생성하는데 사용된다.
 solana의 blockchain update를 직접적으로 할 수 있는 수단은 오직 sys program이다.
-시스템 내에 account가 있지만 user account를 생성하거나 관리하는 것이 아니라 blockchain을
-업데이트하는데 있어서는 account가 필요하지 않다.
-그럼에도 genesis에 account가 생성된 이유는 초기의 sys program state를 나타내기 때문이다.
+blockchain을 업데이트하는데 있어서 account가 필요하지 않다. 그렇지만 sys 프로그램은 블록체인의 가장 low-level 작업을 수행하기 때문에
+(예를 들면 program account를 생성하는데 sys account가 필요하다.) 계정이 필요하다.
+추가로 sys account는 초기의 sys program state를 나타내는 역할도 한다.
 blockchain이 시작되면 sys program이 메모리에 로드되고 state는 해당 account의 데이터로 표시된다.
 이 account는 blockchain을 부트스트랩하고 sys program이 제대로 로드되고 blockchain을 업데이트할
 준비가 되었는지 확인하는데 필요하다.

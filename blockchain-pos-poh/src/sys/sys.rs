@@ -2,7 +2,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::collections::{HashMap, HashSet};
 
 use crate::block::Block;
-use crate::Hash;
+use crate::{Hash, Pubkey, Token};
+
+pub struct ProgramAccount {
+    pub program_id: Pubkey,
+    pub owner: Pubkey,
+    pub data: Vec<u8>,
+    pub executable: bool,
+}
 
 pub struct Sys {
     pub current_block: Block,
@@ -11,8 +18,9 @@ pub struct Sys {
 
 impl Sys {
     // leader node's work
-    pub fn genesis() -> Self {
+    pub fn genesis() -> (Self, ProgramAccount) {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+
         let mut block = Block::new(
             [0u8; 64],
             0,
@@ -29,11 +37,40 @@ impl Sys {
         let mut block_hash = HashSet::new();
         block_hash.insert(block.hash.clone());
 
-        Self {
-            current_block: block,
-            block_hash,
+        (
+            Self {
+                current_block: block,
+                block_hash,
+            }
+            ,
+            ProgramAccount {
+                program_id: Pubkey::new_rand(),
+                owner: Pubkey::new_rand(),
+                data: vec![],
+                executable: false
+            }
+        )
+    }
+
+    pub fn create_account(
+        &mut self,
+        accounts: &mut HashMap<Pubkey, u64>,
+        owner: Pubkey,
+        data: Vec<u8>,
+        balance: u64,
+        executable: bool,
+    ) -> ProgramAccount {
+        let program_id = Pubkey::new_rand();
+        accounts.insert(program_id, balance);
+
+        ProgramAccount {
+            program_id,
+            owner,
+            data,
+            executable
         }
     }
+
 
     // leader node's work. 동시에 여러 노드가 진행할 수 있음.
     pub fn create_block(&mut self) -> Block {

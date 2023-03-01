@@ -4,7 +4,7 @@ use std::collections::HashMap;
 #[derive(Clone)]
 pub struct Account {
     balance: u64,
-    owner: Pubkey,
+    pub owner: Pubkey,
     lamports: u64, // 0.000000001 sol
     data: Vec<u8>,
     executable: bool, // account에 실행 가능한 프로그램(e.g. samrt contract)이 포함되어 있는지 여부
