@@ -21,23 +21,18 @@ Modify the state of a program by executing the state manipulation rules defined 
 ### 1. Nodes
 These configuration files are used to specify parameters such as network address, port numbers, performance settings, and security settings.
 #### Full node
-Todo!();
 The full node configuration file is used to configure the behavior of a full node in the Solana network. It includes parameters such as the network address, port numbers, and file paths for the node's data and log files. It also includes settings for the node's performance and security, such as the number of threads to use for transaction processing and the amount of memory to allocate for the node's database.
 
 #### Validator
-Todo!();
 The validator configuration file is used to configure a validator node in the Solana network. It includes parameters such as the node's validator identity and staking information, as well as the network address and port numbers for the node. It also includes settings for the node's performance and security, such as the number of threads to use for block production and the maximum transaction rate the node can handle.
 
 #### Archiver
-Todo!();
 The archiver configuration file is used to configure an archiver node in the Solana network. It includes parameters such as the node's network address and port numbers, as well as the file paths for the node's data and log files. It also includes settings for the node's performance and security, such as the maximum amount of disk space to use for storing historical blockchain data.
 
 #### Edge
-Todo!();
 The edge configuration file is used to configure an edge node in the Solana network. It includes parameters such as the node's network address and port numbers, as well as settings for the node's performance and security, such as the maximum number of requests the node can handle and the maximum amount of memory to use for request processing.
 
 #### bootstrapper(optional)
-Todo!();
 This is a type of node that helps new nodes join the Solana network by providing them with information about the existing nodes in the network.
 
 ### 2. DB
@@ -45,7 +40,6 @@ This category includes the components and files related to the storage and manag
 These components and files help ensure the accuracy and consistency of the blockchain data and improve the availability and reliability of the network.
 
 #### Blockchain DB
-Todo!();
 The blockchain DB is a database that stores the state of blockchain on the Solana.
 
 - In the real Solana network, the blockchain data is not stored in a separate configmap, but rather in the distributed ledger itself.
