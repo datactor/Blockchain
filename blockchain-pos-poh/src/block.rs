@@ -96,6 +96,26 @@ impl Block {
     }
 }
 
+impl Default for Block {
+    fn default() -> Self {
+        Self {
+            signature: [0u8; 64],
+            slot: 0,
+            timestamp: 0,
+            parent_slot: 0,
+            transaction_root: Hash([0u8; 32]),
+            prev_block_hash: Hash([0u8; 32]),
+            rewards: HashMap::new(),
+            is_confirmed: false,
+            hash: Hash([0u8; 32]),
+            transactions: Vec::new(),
+            working_stake: 0,
+            total_stake: 0,
+            block_height: 0,
+        }
+    }
+}
+
 impl Hashable for Block {
     fn update(&self) -> Vec<u8> {
         let mut bytes = Vec::new();

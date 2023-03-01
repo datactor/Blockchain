@@ -4,14 +4,12 @@ use bs58::{decode, encode};
 use crate::Token;
 
 pub fn run() {
-    let (sys, sys_account) = Sys::genesis();
+    let (sys, sys_account, chain) = Sys::genesis();
 
     let genesis = spawn_genesis();
     let blockchain = Blockchain::genesis(genesis.0);
     let mut account_set = genesis.1.clone();
 
-    // let x = Privatekey::new();
-    // println!("{:?}", x);
 
     // 1. The validator requests the network to create a block.
     // 2. The network selects a leader node to create a block.

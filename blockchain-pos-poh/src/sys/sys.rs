@@ -2,10 +2,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::collections::{HashMap, HashSet};
 
 use crate::block::Block;
-use crate::{Hash, Pubkey, Token};
+use crate::{Blockchain, Hash, Pubkey, Token};
 
+#[derive(Clone)]
 pub struct ProgramAccount {
-    pub program_id: Pubkey,
+    pub lamports: u64,
     pub owner: Pubkey,
     pub data: Vec<u8>,
     pub executable: bool,
@@ -14,63 +15,61 @@ pub struct ProgramAccount {
 pub struct Sys {
     pub current_block: Block,
     pub block_hash: HashSet<Hash>,
+    pub program_accounts: HashMap<Pubkey, ProgramAccount>
 }
 
 impl Sys {
     // leader node's work
-    pub fn genesis() -> (Self, ProgramAccount) {
+    pub fn genesis() -> (Self, Pubkey, Blockchain) {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
 
-        let mut block = Block::new(
-            [0u8; 64],
-            0,
-            timestamp,
-            Hash([0; 32]),
-            HashMap::new(),
-            vec![],
-            0,
-            0,
-            0
-        );
-        block.timestamp = timestamp;
+        let sys_program_id = Pubkey::new_rand();
+        let sys_owner = Pubkey::new_rand();
+        let sys_account = ProgramAccount {
+            lamports: 0,
+            owner: sys_owner,
+            data: vec![],
+            executable: false,
+        };
 
-        let mut block_hash = HashSet::new();
-        block_hash.insert(block.hash.clone());
+        let mut program_accounts = HashMap::new();
+        program_accounts.insert(sys_program_id, sys_account);
 
         (
             Self {
-                current_block: block,
-                block_hash,
-            }
-            ,
-            ProgramAccount {
-                program_id: Pubkey::new_rand(),
-                owner: Pubkey::new_rand(),
-                data: vec![],
-                executable: false
+                current_block: Block::default(),
+                block_hash: HashSet::new(),
+                program_accounts,
+            },
+            sys_program_id,
+            Blockchain {
+                blocks: vec![],
+                height: 0,
+                rewards: HashMap::new(),
             }
         )
     }
 
     pub fn create_account(
         &mut self,
-        accounts: &mut HashMap<Pubkey, u64>,
         owner: Pubkey,
         data: Vec<u8>,
-        balance: u64,
+        lamports: u64,
         executable: bool,
-    ) -> ProgramAccount {
+    ) -> Pubkey {
         let program_id = Pubkey::new_rand();
-        accounts.insert(program_id, balance);
 
-        ProgramAccount {
-            program_id,
+        let program_account = ProgramAccount {
+            lamports,
             owner,
             data,
-            executable
-        }
-    }
+            executable,
+        };
 
+        self.program_accounts.insert(program_id, program_account);
+
+        program_id
+    }
 
     // leader node's work. 동시에 여러 노드가 진행할 수 있음.
     pub fn create_block(&mut self) -> Block {
@@ -97,10 +96,10 @@ impl Sys {
         block
     }
 
-    // pub fn update_chain(&mut self) {
-    //     self.current_block = block.clone();
-    //     self.block_hash.insert(block.hash.clone());
-    //
-    //     // blockchain.push(self.current_block)
-    // }
+    pub fn update_chain(&mut self, block: Block, blockchain: &mut Blockchain) {
+        self.current_block = block.clone();
+        self.block_hash.insert(block.hash.clone());
+
+        blockchain.add_block(self.current_block.clone())
+    }
 }
