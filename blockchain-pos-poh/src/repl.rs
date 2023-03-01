@@ -62,7 +62,6 @@ pub fn login_menu_main(accountset: &AccountSet) {
                     1 => {
                         println!("log in\n");
                         result_wrapper(login(accountset));
-                        continue
                     },
                     2 => {
                         println!("create new wallet\n");
@@ -80,32 +79,8 @@ pub fn login_menu_main(accountset: &AccountSet) {
 }
 
 fn create_new_wallet(accountset: &AccountSet) -> Result<Account, Error> {
-    // thread_rng() vs OsRng?
-    // OsRng는 OS별 메서드를 사용해 안전하고 예측할 수 없도록 설계된 난수를 사용한다.
-    // thread_rng는 범용 사례에 적합한 단순한 난수 생성기이지만 민감한 응용프로그램에 대해 암호학적으로는
-    // 안전을 보증하지는 못함.
-    // 즉 OsRng는 보다 암호화 응용프로그램에 더 적합하다.
-    // 그렇지만 humancheck 수단에 있어서는 암호화 목적으로 사용하지 않기 때문에 OsRng를 사용할 필요는 없다.
-
-    let mut is_human: Option<bool> = None;
-
-    for i in 0..5 {
-        let rand_num = thread_rng().gen_range(100_000_000_000..1_000_000_000_000);
-        println!("Type this 12 digit number: {} ({}/5)", rand_num, 5 - i);
-        match input::<usize>() {
-            Ok(n) if n == rand_num => {
-                is_human = Some(true);
-                println!("Identified");
-                break;
-            }
-            Ok(_) => println!("Wrong number. try again"),
-            Err(_) => {},
-        }
-    }
-
-    if let Some(false) | None = is_human {
-        println!("Identification failed. Returning to main menu.");
-        return Err(Error::HumanIdentificationError);
+    if let Err(e) = is_human() {
+        return Err(e)
     }
 
     let new_private = loop {
@@ -150,8 +125,8 @@ fn login(accountset: &AccountSet) -> Result<Account, Error> {
                     let mut input_keypair = n.replace(" ", "");
                     input_keypair = input_keypair.replace("\n", "");
                     let input_keypair = input_keypair
-                        .strip_prefix("[").unwrap_or(&*input_keypair)
-                        .strip_suffix("]").unwrap_or(&*input_keypair);
+                        .strip_prefix("[").unwrap_or(&input_keypair)
+                        .strip_suffix("]").unwrap_or(&input_keypair);
                     let keypair_bytes_result: Result<Vec<u8>, Error> = input_keypair
                         .split(',')
                         .map(|s| s.trim().parse::<u8>().map_err(|_| Error::ParseIntError))
@@ -220,4 +195,35 @@ fn result_wrapper<T>(result: Result<T, Error>) -> Option<T> {
             None
         }
     }
+}
+
+fn is_human() -> Result<(), Error> {
+    // thread_rng() vs OsRng?
+    // OsRng는 OS별 메서드를 사용해 안전하고 예측할 수 없도록 설계된 난수를 사용한다.
+    // thread_rng는 범용 사례에 적합한 단순한 난수 생성기이지만 민감한 응용프로그램에 대해 암호학적으로는
+    // 안전을 보증하지는 못함.
+    // 즉 OsRng는 보다 암호화 응용프로그램에 더 적합하다.
+    // 그렇지만 humancheck 수단에 있어서는 암호화 목적으로 사용하지 않기 때문에 OsRng를 사용할 필요는 없다.
+    let mut is_human: Option<bool> = None;
+
+    for i in 0..5 {
+        let rand_num = thread_rng().gen_range(100_000_000_000..1_000_000_000_000);
+        println!("Type this 12 digit number: {} ({}/5)", rand_num, 5 - i);
+        match input::<usize>() {
+            Ok(n) if n == rand_num => {
+                is_human = Some(true);
+                println!("Identified");
+                break;
+            }
+            Ok(_) => println!("Wrong number. try again"),
+            Err(_) => {},
+        }
+    }
+
+    if let Some(false) | None = is_human {
+        println!("Identification failed. Returning to main menu.");
+        return Err(Error::HumanIdentificationError);
+    }
+
+    Ok(())
 }
