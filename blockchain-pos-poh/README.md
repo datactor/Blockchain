@@ -1,5 +1,22 @@
 # BLOCKCHAIN - PoS & PoH(SOL)
 
+## Structure
+
+### 1. state structure
+A state structure that maintains the state of the program. (e.g. accounts, blockchain)
+
+This state can be anything from a simple variable to a complex data structure.
+State is stored on the Solana blockchain, a distributed ledger maintained by all nodes in the Solana network.
+
+### 2. program code
+Program code that defines state manipulation rules. (e.g. mint, sys, token, stake)
+
+This code runs on the Solana network whenever a transaction is submitted to the network.
+Program code can read and write to the state, and can also emit log messages.
+
+### 3. Actor (validator, participants, nodes)
+Modify the state of a program by executing the state manipulation rules defined by the program. (e.g. Full node, validator, archiver, edge, bootstrapper)
+
 ## Configuration
 ### 1. Nodes
 These configuration files are used to specify parameters such as network address, port numbers, performance settings, and security settings.
@@ -27,33 +44,38 @@ This is a type of node that helps new nodes join the Solana network by providing
 This category includes the components and files related to the storage and management of blockchain data.
 These components and files help ensure the accuracy and consistency of the blockchain data and improve the availability and reliability of the network.
 
+#### Blockchain DB
+Todo!();
+The blockchain DB is a database that stores the state of blockchain on the Solana.
+
+- In the real Solana network, the blockchain data is not stored in a separate configmap, but rather in the distributed ledger itself.
+- In the Solana architecture, both the account database and the blockchain are stored in a single global state.
+  One huge global db, distributing this.
+  It is distributed to the nodes of the network in the form of accountdb and blockchaindb.
+  And each node gets distributed accountdb and blockchaindb from configmap.
+  Then, it is accessed to perform verification and operation.
 #### Snapshot Archives
 Todo!();
 A snapshot archive is a compressed file that contains a copy of the Solana blockchain data at a specific point in time. Snapshot archives are used to help new nodes quickly synchronize with the network, by providing them with a pre-built copy of the blockchain data that they can use to bootstrap their local copy. Snapshot archives can be created manually or automatically by a validator node using the Solana CLI.
 
 #### Accounts DB
-Todo!();
 The Accounts DB is a database that stores the state of all accounts on the Solana blockchain. It is used by full nodes and validators to validate transactions and produce new blocks. The Accounts DB can be configured to use different storage backends, such as local disk storage or cloud-based storage services like Amazon S3.
 
 #### Vote Account
-Todo!();
 A vote account is a special type of account that is used by validator nodes to participate in the consensus process and produce new blocks. Vote accounts are associated with a specific validator node, and are used to store the node's staking information and vote tokens. Validators must stake a certain amount of SOL tokens to participate in the consensus process, and the amount of stake determines the node's voting power and ability to produce new blocks.
 
 #### Replicator
-Todo!();
 A replicator is a type of node that helps distribute and replicate the Accounts DB across the Solana network. Replicators store a copy of the Accounts DB and use a gossip network to exchange updates with other replicators and nodes in the network. Replicators help improve the availability and reliability of the Accounts DB, and can help reduce the time and bandwidth required to synchronize new nodes with the network.
 
 ### 3. CLI
 The CLI is a tool that allows developers and node operators to interact with the Solana network and perform various operations, such as creating and deploying programs, querying the blockchain, and managing wallet accounts. The CLI configuration file is used to specify parameters such as default network address and port numbers, as well as developer-specific settings.
 
 #### CLI
-Todo!();
 The CLI configuration file is used to configure the Solana command-line interface (CLI). It includes parameters such as the default network address and port numbers, as well as settings for the CLI's performance and security, such as the default transaction fee and the maximum transaction rate the CLI can handle.
 
 
 ## Programs
 ### sys program
-Todo!();
 시스템 내부에 account가 있으며, 블록체인 업데이트에 사용된다.
 solana의 blockchain update를 직접적으로 할 수 있는 수단은 오직 sys program이다.
 시스템 내에 account가 있지만 user account를 생성하거나 관리하는 것이 아니라 blockchain을
@@ -64,7 +86,6 @@ blockchain이 시작되면 sys program이 메모리에 로드되고 state는 해
 준비가 되었는지 확인하는데 필요하다.
 
 ### mint program
-Todo!();
 genesis에서 account 생성, 새로운 Sol token을 생성하는데 사용되며 Mint program에서 관리한다.
 mint의 잔액은 총 sol token수와 직접 관련된다. 모든 solana token은 Mint account를 거쳐서 가기 때문이다.
 solana가 처음 발행되면 mint account로 입금된다. Validator가 block보상을 받는 것 역시 mint로부터 입금되고,
@@ -94,7 +115,6 @@ mint account의 balance에서 소각한다.
 6. Token Minting Fees: Plan to charge a fee for minting new tokens, I have to implement the logic for calculating and deducting this fee from the minted tokens.
 
 ### token program
-Todo!();
 genesis에서 account 생성, Token program은 토큰의 생성, tx, destruction을 담당한다.
 총 공급량, 개별 유저 잔액 및 토큰 메타데이터를 포함하여 토큰에 대한 정보를 저장하려면 계정이 필요하다.
 mint 프로그램은 주로 토큰 생성 및 burnt를 담당하는 반면, Token program은 유통 중인
@@ -113,14 +133,11 @@ mint program과 토큰 program의 주요 차이점 중 하나는 mint program은
 잔액 및 메타데이터를 포함하여 개별 토큰 자체를 관리하는 역할을 한다는 것이다.
 
 ### stake program
-Todo!();
 
 ### BPF(Berkeley Packet Filter)
-Todo!();
 솔라나 위에 Dapp을 구축할 수 있게 만들어주는 핵심 구성 요소.
 Rust, C, AssemblyScript를 비롯한 프로그램으로 smart contract를 작성하고 배포할 수 있는 경량 가상 머신.
 #### Serum program
-Todo!();
 user가 Solana blockchain에서 토큰을 거래할 수 있는 탈중앙화 거래소(Dex)
 serum 프로그램은 솔라나의 tx만 가능하기 때문에 Erc20을 사용하지 않으며,
 대신 자체 프로토콜(serum protocol)을 사용한다. 솔라나의 체인 상에서 동작하도록 최적화 되어있기 때문에
@@ -138,18 +155,13 @@ wrapping된 토큰을 사용하여 이더리움 기반 자산을 솔라나의 �
 
 
 #### Transaction processing
-Todo!();
 
 #### Smart contract language: Rust
 #### Token standard
-Todo!();
 The token standard that will be used for creating and managing different types of tokens on your blockchain.
 #### Node software
-Todo!();
 The software that can run different types of nodes on your blockchain, such as full nodes, validators, and edge nodes.
 #### Wallet software
-Todo!();
 The software that can manage private keys and interact with your blockchain.
 #### Development tools
-Todo!();
 The tools and libraries that can be used for developing and deploying smart contracts, interacting with the blockchain, and testing the network.
