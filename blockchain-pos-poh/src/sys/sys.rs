@@ -19,10 +19,7 @@ pub struct Sys {
 }
 
 impl Sys {
-    // leader node's work
-    pub fn genesis() -> (Self, Pubkey, Blockchain) {
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-
+    pub fn create_sys_account() -> Option<Sys> {
         let sys_program_id = Pubkey::new_rand();
         let sys_owner = Pubkey::new_rand();
         let sys_account = ProgramAccount {
@@ -35,19 +32,13 @@ impl Sys {
         let mut program_accounts = HashMap::new();
         program_accounts.insert(sys_program_id, sys_account);
 
-        (
-            Self {
-                current_block: Block::default(),
-                block_hash: HashSet::new(),
-                program_accounts,
-            },
-            sys_program_id,
-            Blockchain {
-                blocks: vec![],
-                height: 0,
-                rewards: HashMap::new(),
-            }
-        )
+        let sys = Self {
+            current_block: Block::default(),
+            block_hash: HashSet::new(),
+            program_accounts,
+        };
+
+        Some(sys)
     }
 
     pub fn create_account(
@@ -70,6 +61,12 @@ impl Sys {
 
         program_id
     }
+
+    // leader node's work
+    pub fn genesis() -> Blockchain {
+        Blockchain::genesis()
+    }
+
 
     // leader node's work. 동시에 여러 노드가 진행할 수 있음.
     pub fn create_block(&mut self) -> Block {
@@ -97,9 +94,16 @@ impl Sys {
     }
 
     pub fn update_chain(&mut self, block: Block, blockchain: &mut Blockchain) {
-        self.current_block = block.clone();
         self.block_hash.insert(block.hash.clone());
+        self.current_block = block;
 
-        blockchain.add_block(self.current_block.clone())
+        blockchain.add_block(&mut self.current_block).expect("chain update failure");
     }
+}
+
+pub fn create_essential_id(sys: &mut Sys, owner: Pubkey) -> (Pubkey, Pubkey) {
+    let token_id = sys.create_account(owner, vec![], 0, false);
+    let mint_id = sys.create_account(owner, vec![], 0, false);
+
+    (token_id, mint_id)
 }

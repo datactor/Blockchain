@@ -23,18 +23,38 @@ pub struct Blockchain {
 }
 
 impl Blockchain {
-    pub fn genesis(genesis: Block) -> Self {
-        Blockchain {
-            blocks: vec![genesis],
+    pub fn genesis() -> Self {
+        let mut genesis = Block::default();
+
+        let mut genesis_chain = Blockchain {
+            blocks: vec![genesis.clone()],
             height: 0,
             rewards: HashMap::new(),
-        }
+        };
+
+        genesis_chain.add_block(&mut genesis).unwrap();
+
+        genesis_chain
     }
 
-    pub fn add_block(&mut self, block: Block) {
-        self.blocks.push(block);
-        self.height += 1;
+    pub fn add_block(&mut self, block: &mut Block) -> Result<(), String> {
+        if self.blocks.is_empty() {
+            // Special case for genesis block
+            if block.prev_block_hash != Hash([0u8; 32]) {
+                return Err(String::from("Invalid genesis block - previous hash should be zero"));
+            }
+        } else {
+            // Check that previous hash matches
+            if self.blocks.last().map_or(false, |b| b.hash != block.prev_block_hash) {
+                return Err(String::from("Invalid block - previous hash doesn't match"));
+            }
+            self.height += 1;
+        }
+
+        self.blocks.push(block.clone());
         self.update_rewards();
+
+        Ok(())
     }
 
     fn update_rewards(&mut self) {

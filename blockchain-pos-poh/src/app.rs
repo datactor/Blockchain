@@ -4,12 +4,22 @@ use bs58::{decode, encode};
 use crate::Token;
 
 pub fn run() {
-    let (sys, sys_account, chain) = Sys::genesis();
+    // let (sys, sys_account, chain) = Sys::genesis();
 
-    let genesis = spawn_genesis();
-    let blockchain = Blockchain::genesis(genesis.0);
-    let mut account_set = genesis.1.clone();
+    // let genesis = spawn_genesis();
+    // let blockchain = Blockchain::genesis(genesis.0);
 
+    let sys = Sys::create_sys_account();
+    let blockchain = Sys::genesis();
+    let owner = Pubkey::new_rand();
+    let (token_id, mint_id) = create_essential_id(&mut sys.unwrap(), owner);
+
+    let mint = Mint::genesis(1_000_000_000_000, owner, 2);
+    let token = Token::genesis(mint.total_supply, owner, 2);
+
+    let mut accountset = AccountSet::new();
+
+    login_menu_main(&mut accountset);
 
     // 1. The validator requests the network to create a block.
     // 2. The network selects a leader node to create a block.
@@ -41,7 +51,7 @@ pub fn run() {
     // let mut tx = Transaction::create(&private_key, &recipient_pubkey, amount, recent_blockhash);
     // tx.sign(&private_key);
 
-    login_menu_main(&mut account_set);
+
 
     let pubkey = [0u8; 32];
     let encoded_pubkey = encode(&pubkey).into_string();

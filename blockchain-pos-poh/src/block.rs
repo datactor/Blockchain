@@ -1,6 +1,7 @@
 use std::{
     fmt::{self, Debug, Formatter, Result},
     collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use super::*;
@@ -24,7 +25,7 @@ pub struct Block {
     // // The hash of the root of the vote accounts tree
     // votes: Hash,
 
-    prev_block_hash: Hash,
+    pub prev_block_hash: Hash,
     pub rewards: HashMap<Pubkey, u64>,
     is_confirmed: bool,
     pub(crate) hash: Hash,
@@ -79,14 +80,6 @@ impl Block {
         }
     }
 
-    pub fn create(&mut self, parent_block_hash: Hash, block_height: u64) {
-        self.parent_slot = self.slot;
-        self.slot += 1;
-        self.block_height = block_height;
-        self.prev_block_hash = parent_block_hash;
-        self.hash = self.finalize();
-    }
-
     pub fn is_valid(&self, difficulty: u64) -> bool {
         self.update();
         let hash = self.finalize();
@@ -101,7 +94,7 @@ impl Default for Block {
         Self {
             signature: [0u8; 64],
             slot: 0,
-            timestamp: 0,
+            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
             parent_slot: 0,
             transaction_root: Hash([0u8; 32]),
             prev_block_hash: Hash([0u8; 32]),
