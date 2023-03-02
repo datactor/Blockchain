@@ -1,4 +1,6 @@
 use chrono::prelude::*;
+use ed25519_dalek::ed25519::Error;
+use ed25519_dalek::Verifier;
 
 pub mod block;
 pub mod blockchain;
@@ -23,9 +25,37 @@ pub use crate::{
     token::token::Token,
     sys::sys::*,
     repl::login_menu_main,
+    transaction::Message,
 };
 
 type Signature = [u8; 64];
+
+impl Hashable for Signature {
+    fn update(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        bytes.extend_from_slice(self.as_ref());
+        bytes
+    }
+}
+
+impl Verifier<S> for Signature {
+    fn verify(&self, msg: &[u8], signature: &Pubkey) -> Result<(), Error> {
+        todo!()
+    }
+}
+
+// impl Signature {
+//     pub fn verify(&self, message: &Message, pubkey: &Pubkey) -> bool {
+//         // 1. Get the bytes of the message and convert them to a digest
+//         let message_bytes = bincode::serialize(message).unwrap();
+//         let message_digest = hash(&message_bytes);
+//
+//         // 2. Verify the signature using the public key and digest
+//         let signature_bytes = self.as_ref();
+//         let pubkey_bytes = pubkey.as_ref();
+//         ed25519_dalek::verify(&message_digest, pubkey_bytes, signature_bytes).is_ok()
+//     }
+// }
 
 pub fn now() -> u128 {
     Utc::now().timestamp_millis() as u128
