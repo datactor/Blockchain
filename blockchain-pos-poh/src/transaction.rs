@@ -12,26 +12,41 @@ use super::*;
 // 4. opt-accountDB: 더 효율적인 데이터 구조사용, 인덱스 수 감소, 확장성 향상을 위한 분산 데이터베이스 사용
 // 5. Offloading to specialized hardware: FPGA 또는 ASIC 같은 특수 하드웨어로 account data 처리를 오프로딩.
 
+// Tx가 일반적으로 사용되는 방법
+// 1. user가 tx의 인수에 실행하고자 하는 instruction을 추가하여 msg struct를 생성한다.
+// 2. 그런 다음 msg를 포함하는 tx struct를 생성하고 개인 키로 서명한다.
+// 3. 서명된 tx는 그런 다음 solana 네트워크에 브로드 캐스팅된다.
+// 4. 네트워크의 validator는 tx의 서명을 확인하고 tx에 포함된 instruction을 실행한다.
+//    msg는 account의 ID, tx가 엑세스 할 수 있는 program_ID 목록,
+//    tx에 대한 메타데이터를 포함하는 헤더 역할을 한다.
+// 5. 명령이 성공적으로 실행되면 tx가 ledger에 commit되고 user의 account balance가 업데이트 된다.
+
+
 #[derive(Clone)]
-pub struct Transaction {
-    pub signatures: Vec<Signature>,
+pub struct Transaction { // 서명된 집합. 네트워크에 브로드캐스트되는 명령의 수
+    pub signatures: Vec<Signature>, // Tx를 인증하는데 사용됨
     pub sender: Pubkey,
     pub recipient: Pubkey,
     pub amount: u64,
-    pub message: Message,
+    pub message: Message, // Msg는 실행 중인 명령을 지정함
     pub fee: u64,
-    pub recent_blockhash: Hash,
+    pub fee_payer: Pubkey,
+    pub recent_blockhash: Hash, // prevent replay attack
+    pub instructions: Vec<CompiledInstruction>,
 }
 
 impl Transaction {
-    pub fn new(signatures: Vec<Signature>,
-               sender: Pubkey,
-               recipient: Pubkey,
-               amount: u64,
-               message: Message,
-               fee: u64,
-               recent_blockhash: Hash)
-        -> Self {
+    pub fn new(
+        signatures: Vec<Signature>,
+        sender: Pubkey,
+        recipient: Pubkey,
+        amount: u64,
+        message: Message,
+        fee: u64,
+        fee_payer: Pubkey,
+        recent_blockhash: Hash,
+        instruction: Vec<CompiledInstruction>,
+    ) -> Self {
         Self {
             signatures,
             sender,
@@ -39,74 +54,53 @@ impl Transaction {
             amount,
             message,
             fee,
+            fee_payer,
             recent_blockhash,
+            instructions: instruction,
         }
     }
 
-    // pub fn verify(&self) -> bool {
-    //     // Verify the signature of the transaction's message
-    //     if !self.message.verify_signature() {
-    //         return false;
-    //     }
-    //
-    //     // Verify the signature of each account's signature
-    //     for account in &self.accounts {
-    //         if !account.verify_signature() {
-    //             return false;
-    //         }
-    //     }
-    //
-    //     // Verify the Merkle proof of the transaction
-    //     if let Some(ref proof) = self.merkle_proof {
-    //         if !proof.verify(self.finalize(), &self.message) {
-    //             return false;
-    //         }
-    //     }
-    //
-    //     true
-    // }
-
-    // // Verify the signature of the transaction
-    // pub fn verify_signature(&self) -> bool {
-    //     for signature in &self.signatures {
-    //         if !self.sender.verify(&self.hash(), &signature) {
-    //             return false;
-    //         }
-    //     }
-    //     true
-    // }
-
-    // pub fn create(private_key: &Privatekey,
-    //               recipient_pubkey: &Pubkey,
-    //               amount: u64,
-    //               recent_blockhash: Hash) -> Self {
-    //     let message = Message::new(
-    //         &[private_key.pubkey(), recipient_pubkey],
-    //         Some(&private_key.pubkey()),
-    //         vec![Instruction::new_system_transfer(
-    //             &private_key.pubkey(),
-    //             recipient_pubkey,
-    //             amount,
-    //         )],
-    //     );
-    //     let signatures = vec![private_key.sign(&message.serialize())];
-    //     let fee = 0;
-    //     Self::new(signatures, message, fee, recent_blockhash)
-    // }
-    //
-    // pub fn sign(&mut self, private_key: &Privatekey) {
-    //     let message_bytes = self.message.serialize();
-    //     self.signatures.push(private_key.sign(&message_bytes));
+    // pub fn sign(&mut self, keypair: &Keypair) {
+    //     let serialized_message = bincode::serialize(&self.message).unwrap();
+    //     let signature = keypair.sign_message(&serialized_message);
+    //     self.signatures.push(signature);
     // }
     //
     // pub fn verify(&self) -> bool {
-    //     let message_bytes = self.message.serialize();
+    //     let serialized_message = bincode::serialize(&self.message).unwrap();
+    //     let message_digest = hash(serialized_message);
     //     for signature in &self.signatures {
-    //         if !signature.verify(&message_bytes, &self.message.account_keys[0]) {
+    //         if !signature.verify(&message_digest, &self.message.header.pubkey) {
     //             return false;
     //         }
     //     }
     //     true
+    // }
+    //
+    // pub fn serialize(&self) -> Vec<u8> {
+    //     let mut serialized_message = bincode::serialize(&self.message).unwrap();
+    //     for signature in &self.signatures {
+    //         serialized_message.extend_from_slice(&signature.to_bytes());
+    //     }
+    //     serialized_message
+    // }
+    //
+    // pub fn deserialize(bytes: &[u8]) -> Self {
+    //     let num_signatures = (bytes.len() - Message::LEN) / Signature::LEN;
+    //     let message_bytes = &bytes[..Message::LEN];
+    //     let signature_bytes = &bytes[Message::LEN..];
+    //     let mut signatures = Vec::new();
+    //     for i in 0..num_signatures {
+    //         let start = i * Signature::LEN;
+    //         let end = start + Signature::LEN;
+    //         let signature = Signature::new(signature_bytes[start..end].try_into().unwrap());
+    //         signatures.push(signature);
+    //     }
+    //     let message = bincode::deserialize(message_bytes).unwrap();
+    //     Self {
+    //         signatures,
+    //         message,
+    //     }
     // }
 }
 
@@ -122,17 +116,16 @@ impl Hashable for Transaction {
         bytes.extend(U64Bytes::from(&self.amount).data);
         // bytes.extend(&self.message.header);
         bytes.extend(U64Bytes::from(&self.fee).data);
-        // bytes.extend(&self.recent_blockhash);
+        bytes.extend(&self.recent_blockhash.0);
         bytes
     }
 }
 
 #[derive(Clone)]
 pub struct Message {
-    pub header: MessageHeader,
-    pub account_keys: Vec<Pubkey>,
-    pub recent_blockhash: Hash,
-    pub instructions: Vec<CompiledInstruction>,
+    pub header: MessageHeader, // 필수 account address와 메타데이터 저장
+    pub account_keys: Vec<Pubkey>, // msg가 의존하는 account address의 배열
+    pub recent_blockhash: Hash, // prevent reply attack
 }
 
 #[derive(Clone)]
