@@ -14,7 +14,7 @@ pub struct Block {
     pub(crate) slot: u64, // index
     // skipped_slots: u64,
     pub(crate) timestamp: u64,
-    parent_slot: u64,
+    parent_timestamp: u64,
 
     // The hash of the root of the transaction merkle tree
     transaction_root: Hash,
@@ -53,6 +53,7 @@ impl Block {
     pub fn new(
         signature: Signature,
         slot: u64, // index
+        parent_timestamp: u64,
         timestamp: u64,
         prev_block_hash: Hash,
         rewards: HashMap<Pubkey, u64>,
@@ -65,7 +66,7 @@ impl Block {
         Block {
             signature,
             slot,
-            parent_slot: 0,
+            parent_timestamp,
             timestamp,
             transaction_root: Hash([0; 32]),
             is_confirmed: false,
@@ -80,13 +81,60 @@ impl Block {
         }
     }
 
-    pub fn is_valid(&self, difficulty: u64) -> bool {
+    pub fn verify_tiny_pow(&self, difficulty: u64) -> bool {
         self.update();
         let hash = self.finalize();
 
         let hash_bits = hash.0.iter().fold(0, |acc, &b| acc + b.count_ones());
         u64::from(hash_bits) >= difficulty
     }
+
+    // Verify the PoS
+    fn verify_pos(&self, previous_block: &Block) -> bool {
+        // Calculate the total stake and working stake
+        let mut total_stake = 0;
+        let mut working_stake = 0;
+
+        for (pubkey, stake) in &self.rewards {
+            total_stake += stake;
+            if previous_block.rewards.get(pubkey).unwrap_or(&0) > stake {
+                working_stake += stake;
+            } else {
+                working_stake += previous_block.rewards.get(pubkey).unwrap_or(&0);
+            }
+        }
+
+        // Check if the working stake is greater than the threshold
+        working_stake > total_stake / 2
+    }
+
+    // Verify the PoH (Proof of History)
+    fn verify_poh(&self) -> bool {
+        // Verify that the block's slot is greater than the slot of the previous block
+        if self.timestamp <= self.parent_timestamp {
+            return false
+        }
+
+        // Verify that the block's hash is correct by recomputing it
+        let mut hash = self.finalize();
+        if hash != self.hash {
+            return false;
+        }
+
+        true
+    }
+
+    // Verify the transactions
+    // fn verify_transactions(&self) -> bool {
+    //     // Verify that each transaction in the block is valid
+    //     for transaction in &self.transactions {
+    //         if !transaction.verify() {
+    //             return false;
+    //         }
+    //     }
+    //
+    //     true
+    // }
 }
 
 impl Default for Block {
@@ -95,7 +143,7 @@ impl Default for Block {
             signature: [0u8; 64],
             slot: 0,
             timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-            parent_slot: 0,
+            parent_timestamp: 0,
             transaction_root: Hash([0u8; 32]),
             prev_block_hash: Hash([0u8; 32]),
             rewards: HashMap::new(),
@@ -118,7 +166,7 @@ impl Hashable for Block {
 
         bytes.extend(&self.signature);
         bytes.extend(U64Bytes::from(&self.slot).data);
-        bytes.extend(U64Bytes::from(&self.parent_slot).data);
+        bytes.extend(U64Bytes::from(&self.parent_timestamp).data);
         bytes.extend(U64Bytes::from(&self.timestamp).data);
         bytes.extend(&self.transaction_root.0);
         if self.is_confirmed {

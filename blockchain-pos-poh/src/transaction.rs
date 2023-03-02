@@ -43,6 +43,39 @@ impl Transaction {
         }
     }
 
+    // pub fn verify(&self) -> bool {
+    //     // Verify the signature of the transaction's message
+    //     if !self.message.verify_signature() {
+    //         return false;
+    //     }
+    //
+    //     // Verify the signature of each account's signature
+    //     for account in &self.accounts {
+    //         if !account.verify_signature() {
+    //             return false;
+    //         }
+    //     }
+    //
+    //     // Verify the Merkle proof of the transaction
+    //     if let Some(ref proof) = self.merkle_proof {
+    //         if !proof.verify(self.finalize(), &self.message) {
+    //             return false;
+    //         }
+    //     }
+    //
+    //     true
+    // }
+
+    // // Verify the signature of the transaction
+    // pub fn verify_signature(&self) -> bool {
+    //     for signature in &self.signatures {
+    //         if !self.sender.verify(&self.hash(), &signature) {
+    //             return false;
+    //         }
+    //     }
+    //     true
+    // }
+
     // pub fn create(private_key: &Privatekey,
     //               recipient_pubkey: &Pubkey,
     //               amount: u64,
@@ -80,7 +113,17 @@ impl Transaction {
 
 impl Hashable for Transaction {
     fn update(&self) -> Vec<u8> {
-        unimplemented!()
+        let mut bytes = Vec::new();
+        for signature in &self.signatures {
+            bytes.extend(signature);
+        }
+        bytes.extend(&self.sender.0);
+        bytes.extend(&self.recipient.0);
+        bytes.extend(U64Bytes::from(&self.amount).data);
+        // bytes.extend(&self.message.header);
+        bytes.extend(U64Bytes::from(&self.fee).data);
+        // bytes.extend(&self.recent_blockhash);
+        bytes
     }
 }
 

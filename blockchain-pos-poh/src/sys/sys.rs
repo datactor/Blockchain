@@ -74,6 +74,7 @@ impl Sys {
         let mut block = Block::new(
             [0u8; 64],
             self.current_block.slot,
+            self.current_block.timestamp,
             timestamp,
             self.current_block.hash.clone(),
             HashMap::new(),
@@ -86,7 +87,7 @@ impl Sys {
         // a tiny of PoW. Acts as a spam filter.
         // 단일 노드에서 너무 많은 블록이 생성되는 것을 방지하기 위한 스팸필터.
         // 블록을 생성하는 노드(leader node)가 이를 위해 일정 계산 리소스를 사용했는지 확인함.
-        while !block.is_valid(0) {
+        while !block.verify_tiny_pow(0) {
             block.slot += 1;
         }
 

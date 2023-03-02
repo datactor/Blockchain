@@ -16,7 +16,6 @@ pub struct Token {
     //
     // account index를 사용하여 특정 소유자가 소유한 토큰 계정을 효율적으로 조회함으로써 Solana는 accountDB의
     // 각 계정을 모두 iter할 필요 없이 모든 토큰 계정의 잔액을 신속하게 검색할 수 있다.
-    // 그러므로 실제 솔라나에는 supply field가 필요 없다.
     pub mint_authority: Pubkey,
     pub decimals: u8,
     pub accounts: HashMap<Pubkey, u64>,
@@ -55,11 +54,21 @@ impl Token {
         *self.accounts.get(&account).unwrap_or(&0)
     }
 
-    pub fn destroy(&mut self, amount: u64, mint: &mut Mint) {
-        // Burn tokens by removing them from the total supply
-        let mint_balance = self.accounts.get_mut(&mint.mint_authority).expect("Mint account balance does not exist.");
-        assert!(*mint_balance >= amount, "Not enough total supply to burn");
-        *mint_balance -= amount;
+    pub fn destroy(&mut self, account: Pubkey, amount: u64, mint: &mut Mint) -> Result<(), String> {
+        // Burn tokens by removing them from account balance(Mint account also available)
+        let balance = self.accounts.entry(account).or_insert(0);
+
+        if *balance < amount {
+            return Err(String::from("A balance cannot be negative"))
+        }
+
+        let total_supply = mint.total_supply;
+        if total_supply < amount {
+            return Err(String::from("Total supply cannot be negative"));
+        }
+
+        *balance -= amount;
         mint.total_supply -= amount;
+        Ok(())
     }
 }
