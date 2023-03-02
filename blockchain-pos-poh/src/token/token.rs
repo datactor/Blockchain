@@ -17,7 +17,6 @@ pub struct Token {
     // account index를 사용하여 특정 소유자가 소유한 토큰 계정을 효율적으로 조회함으로써 Solana는 accountDB의
     // 각 계정을 모두 iter할 필요 없이 모든 토큰 계정의 잔액을 신속하게 검색할 수 있다.
     // 그러므로 실제 솔라나에는 supply field가 필요 없다.
-    pub supply: u64,
     pub mint_authority: Pubkey,
     pub decimals: u8,
     pub accounts: HashMap<Pubkey, u64>,
@@ -31,37 +30,20 @@ impl Token {
         accounts.insert(mint_authority.clone(), total_supply);
 
         Self {
-            supply: total_supply,
             mint_authority,
             decimals,
             accounts,
         }
     }
 
-    pub fn mint_to(
-        &mut self,
-        mint: &mut Mint,
-        authority: Pubkey, // 새롭게 가져온 mint's pubkey.
-        amount: u64
-    ) {
-        assert_eq!(authority, mint.mint_authority);
-        mint.total_supply += amount;
-    }
-
-    pub fn transfer(&mut self, mint: &mut Mint, sender: Pubkey, recipient: Pubkey, amount: u64) -> Result<(), String> {
-        // Transfer tokens from sender to recipient
-        if sender == mint.mint_authority {
-            if self.supply < amount {
-                return Err(String::from("Not enough supply to transfer"));
-            } else {
-                self.supply -= amount;
-            }
-        }
+    // Transfer tokens from sender to recipient
+    pub fn transfer(&mut self, sender: Pubkey, recipient: Pubkey, amount: u64) -> Result<(), String> {
         let sender_balance = self.accounts.entry(sender).or_insert(0);
         if *sender_balance < amount {
             return Err(String::from("Not enough balance to transfer"));
         }
         *sender_balance -= amount;
+
         let recipient_balance = self.accounts.entry(recipient).or_insert(0);
         *recipient_balance += amount;
 
@@ -73,10 +55,11 @@ impl Token {
         *self.accounts.get(&account).unwrap_or(&0)
     }
 
-    pub fn burn(&mut self, amount: u64, mint: &mut Mint) {
+    pub fn destroy(&mut self, amount: u64, mint: &mut Mint) {
         // Burn tokens by removing them from the total supply
-        assert!(self.supply >= amount, "Not enough total supply to burn");
-        self.supply -= amount;
+        let mint_balance = self.accounts.get_mut(&mint.mint_authority).expect("Mint account balance does not exist.");
+        assert!(*mint_balance >= amount, "Not enough total supply to burn");
+        *mint_balance -= amount;
         mint.total_supply -= amount;
     }
 }

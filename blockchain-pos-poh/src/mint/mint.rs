@@ -1,6 +1,6 @@
 // use super::super::*; // not idiomatic
 
-use crate::Pubkey;
+use crate::{Pubkey, Token};
 
 pub struct Mint {
     pub total_supply: u64,
@@ -19,14 +19,31 @@ impl Mint {
         }
     }
 
-    pub fn mint(&mut self, recipient: Pubkey, amount: u64) {
-        // Mint new tokens to mint's account by increasing total supply(mint balance).
-        // The added supply will be managed by the token.
+    pub fn mint(&mut self, token: &mut Token, authority: Pubkey, amount: u64) {
+        assert_eq!(authority, self.mint_authority);
         self.total_supply += amount;
+        let mut mint_balance = token.accounts.get_mut(&self.mint_authority).expect("Mint account balance does not exist.");
+        *mint_balance += amount;
     }
 
-    pub fn burn(&mut self, amount: u64) {
+    // mint to recipients
+    pub fn mint_to(&mut self, token: &mut Token, recipient: Pubkey, amount: u64) -> Result<(), String> {
+        let mint_balance = token.accounts.get_mut(&self.mint_authority).expect("Mint account balance does not exist.");
+        if *mint_balance < amount {
+            return Err(String::from("Not enough supply to transfer"));
+        }
+
+        *mint_balance -= amount;
+
+        let recipient_balance = token.accounts.entry(recipient).or_insert(0);
+        *recipient_balance += amount;
+        Ok(())
+    }
+
+    pub fn burn(&mut self, token: &mut Token, amount: u64) {
         // Burn tokens by removing them from the total supply
+        let mint_balance = token.accounts.get_mut(&self.mint_authority).expect("Mint account balance does not exist.");
         self.total_supply -= amount;
+        *mint_balance -= amount;
     }
 }

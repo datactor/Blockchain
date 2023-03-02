@@ -62,7 +62,6 @@ pub fn login_menu_main(accountset: &mut AccountSet) {
                     0 => break, // exit program
                     1 => {
                         println!("log in\n");
-                        // let account = result_wrapper(login(accountset));
                         if let Some(account) = result_wrapper(login(accountset)) {
                             accountset.insert_account(account.owner.clone(), account.clone());
                             action_menu(account, accountset)
