@@ -1,10 +1,10 @@
 use super::*;
+use rocksdb::{DB, Options, WriteBatch, WriteOptions, ReadOptions, IteratorMode, DBWithThreadMode, SingleThreaded};
 use std::{
     io::{self, prelude::*, },
     env,
     fmt::Debug,
     str::FromStr,
-
 };
 use bs58::{decode, encode};
 use ring::signature::{Ed25519KeyPair, KeyPair};
@@ -36,6 +36,8 @@ impl std::fmt::Display for Error {
 // impl std::error::Error for Error {}
 
 pub fn login_menu_main(accountset: &mut AccountSet) {
+    let db = DB::open_default("./db/accountDB").unwrap();
+
     let args: Vec<String> = env::args().collect();
     let mut accountset = accountset;
 
@@ -62,17 +64,16 @@ pub fn login_menu_main(accountset: &mut AccountSet) {
                     0 => break, // exit program
                     1 => {
                         println!("log in\n");
-                        if let Some(account) = result_wrapper(login(accountset)) {
-                            accountset.insert_account(account.owner.clone(), account.clone());
-                            action_menu(account, accountset)
+                        if let Some(mut account) = result_wrapper(login(accountset, &db)) {
+                            // action_menu(&mut account, accountset)
                         }
                     },
                     2 => {
                         println!("create new wallet\n");
                         // let account = result_wrapper(create_new_wallet(accountset));
-                        if let Some(account) = result_wrapper(create_new_wallet(accountset)) {
+                        if let Some(mut account) = result_wrapper(create_new_wallet(accountset)) {
                             accountset.insert_account(account.owner.clone(), account.clone());
-                            action_menu(account, accountset)
+                            action_menu(&mut account, accountset)
                         }
                     },
                     _ => {
@@ -86,7 +87,7 @@ pub fn login_menu_main(accountset: &mut AccountSet) {
     }
 }
 
-fn action_menu(account: Account, accountset: &mut AccountSet) {
+fn action_menu(account: &mut Account, accountset: &mut AccountSet) {
     println!("action menu");
 
     loop {
@@ -104,7 +105,7 @@ fn action_menu(account: Account, accountset: &mut AccountSet) {
                 },
                 2 => {
                     println!("Balance\n");
-                    // account.
+                    get_balance(account);
                 },
                 _ => {
                     println!("Please enter a valid number (0 - 2)\n");
@@ -114,7 +115,10 @@ fn action_menu(account: Account, accountset: &mut AccountSet) {
             Err(_) => continue
         }
     }
+}
 
+fn get_balance(account: &mut Account) {
+    println!("balance: {}", account.balance);
 }
 
 fn create_new_wallet(accountset: &AccountSet) -> Result<Account, Error> {
@@ -136,6 +140,21 @@ fn create_new_wallet(accountset: &AccountSet) -> Result<Account, Error> {
             "y" => {
                 let new_account = Account::new(0, new_private.pubkey(), 0, vec![], false, Some(new_private.sign(&[0u8; 32])));
                 // accountset.insert_account(new_private.pubkey(), new_account);
+                let path = "./db/accountDB";
+                let mut opts = Options::default();
+                // opts.create_if_missing(true); // default is true
+
+                let db = DB::open(&opts, path).unwrap();
+                let key = new_private.pubkey().0;
+                let value = new_account.finalize().0;
+                db.put(key, value).unwrap();
+                let result = db.get(key);
+                match result {
+                    Ok(Some(value)) => println!("retrieved value: {:?}", value),
+                    Ok(None) => println!("value not found"),
+                    Err(e) => println!("operational problem encountered: {}", e),
+                }
+
                 println!("The wallet has been successfully registered");
                 return Ok(new_account)
             },
@@ -150,7 +169,8 @@ fn create_new_wallet(accountset: &AccountSet) -> Result<Account, Error> {
     Err(Error::InvalidConversionError)
 }
 
-fn login(accountset: &AccountSet) -> Result<Account, Error> {
+fn login(accountset: &AccountSet, db: &DBWithThreadMode<SingleThreaded>) -> Result<Hash, Error> {
+    let read_opts = ReadOptions::default();
     println!("\n\
              Please input your private key.\n\
              or Enter 0 if you want to go back");
@@ -195,9 +215,13 @@ fn login(accountset: &AccountSet) -> Result<Account, Error> {
                         }
                     };
 
-                    if let Some(pubkey) = accountset.get_account(&Pubkey(keypair_array)) {
+                    // if let Some(pubkey) = accountset.get_account(&Pubkey(keypair_array)) {
+                    //     println!("log in success");
+                    //     return Ok(pubkey.clone());
+                    if let Ok(Some(account)) = db.get_opt(&Pubkey(keypair_array), &read_opts) {
                         println!("log in success");
-                        return Ok(pubkey.clone());
+                        // let account_hash: [u8; 32] = account.try_into().unwrap();
+                        return Ok(Hash(account.try_into().unwrap()));
                     } else {
                         println!("This keypair does not exist.")
                     }

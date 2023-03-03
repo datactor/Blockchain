@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct Account {
-    balance: u64,
+    pub balance: u64,
     pub owner: Pubkey,
     lamports: u64, // 0.000000001 sol
     data: Vec<u8>,
@@ -49,5 +49,28 @@ impl AccountSet {
 
     pub fn insert_account(&mut self, pubkey: Pubkey, account: Account) {
         self.accounts.insert(pubkey, account);
+    }
+}
+
+impl Hashable for Account {
+    fn update(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+
+        bytes.extend(U64Bytes::from(&self.balance).data);
+        bytes.extend(&self.owner.0);
+        bytes.extend(U64Bytes::from(&self.lamports).data);
+        bytes.extend(&self.data);
+        if self.executable{
+            bytes.push(0x01);
+        } else {
+            bytes.push(0x00);
+        };
+        if let Some(signature) = &self.signature {
+            bytes.extend(signature);
+        } else {
+            bytes.push(0x00);
+        }
+
+        bytes
     }
 }

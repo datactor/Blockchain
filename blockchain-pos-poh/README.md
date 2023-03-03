@@ -39,6 +39,8 @@ This is a type of node that helps new nodes join the Solana network by providing
 This category includes the components and files related to the storage and management of blockchain data.
 These components and files help ensure the accuracy and consistency of the blockchain data and improve the availability and reliability of the network.
 
+Using RocksDB, which supports atomic read/write and snapshots of key value pairs.
+
 #### Blockchain DB
 The blockchain DB is a database that stores the state of blockchain on the Solana.
 

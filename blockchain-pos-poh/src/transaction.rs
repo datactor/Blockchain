@@ -1,5 +1,7 @@
 use std::collections::HashMap;
-use ed25519_dalek::Verifier;
+// use bincode::{serialize, deserialize};
+use serde::{Serialize, Deserialize};
+
 use super::*;
 
 // leader node가 account db를 조회하지 않고 Pubkey와 balance를 먼저 넣을 방법이 있어야함
@@ -62,53 +64,42 @@ impl Transaction {
         }
     }
 
-    // Verify the transaction's signatures
-    pub fn verify_signatures(&self) -> bool {
-        // Step 1: Get the public keys of all the signatures
-        let public_keys: Vec<Pubkey> = self
-            .signatures
-            .iter()
-            .map(|signature| signature.verify(&self.message, &self.sender))
-            .filter_map(|result| Some(result))
-            .collect();
-
-        // Step 2: Check that the number of signatures matches the number of public keys
-        if self.signatures.len() != public_keys.len() {
-            return false;
-        }
-
-        // Step 3: Check that all the signatures are valid
-        for (i, signature) in self.signatures.iter().enumerate() {
-            if !signature.verify(&[self.message.header.num_readonly_signed_accounts], &public_keys[i]).is_ok() {
-                return false;
-            }
-
-            let signature_bytes = signature.as_ref();
-            let pubkey_bytes = pubkey.as_ref();
-
-            ed25519_dalek::verify(&message_bytes, pubkey_bytes, signature_bytes).is_ok()
-        }
-
-        true
-    }
-
-    // Verify the transaction
-    pub fn verify(&self, blockhash: Hash) -> bool {
-        self.verify_signatures() && self.verify_fee() && self.verify_recent_blockhash(blockhash)
-    }
-
-
-    // Verify the transaction's fee
-    pub fn verify_fee(&self) -> bool {
-        self.fee_payer == self.sender && self.fee <= self.amount
-    }
-
-    // Verify the transaction's recent blockhash
-    pub fn verify_recent_blockhash(&self, blockhash: Hash) -> bool {
-        self.recent_blockhash == blockhash
-    }
-
-    // Execute the transaction's instructions
+    // // Verify the transaction's signatures
+    // pub fn verify_signatures(&self) -> bool {
+    //     // Step 1: Get the public keys of all the signatures
+    //     let public_keys: Vec<Pubkey> = self
+    //         .signatures
+    //         .iter()
+    //         // .map(|signature| signature.verify(&self.message, &self.sender))
+    //         .map(|signature| verify(&self.sender.0, serialize(&self.message).unwrap().try_into().unwrap(), signature))
+    //         .filter_map(|result| result)
+    //         .collect();
+    //     // Step 2: Check that the number of signatures matches the number of public keys
+    //     if self.signatures.len() != public_keys.len() {
+    //         return false;
+    //     }
+    //
+    //     // Step 3: Check that all the signatures are valid
+    //     for (i, signature) in self.signatures.iter().enumerate() {
+    //         if !signature.verify(&self.message, &public_keys[i]).is_ok() {
+    //             return false;
+    //         }
+    //     }
+    //
+    //     true
+    // }
+    //
+    // // Verify the transaction's fee
+    // pub fn verify_fee(&self) -> bool {
+    //     self.fee_payer == self.sender && self.fee <= self.amount
+    // }
+    //
+    // // Verify the transaction's recent blockhash
+    // pub fn verify_recent_blockhash(&self, blockhash: Hash) -> bool {
+    //     self.recent_blockhash == blockhash
+    // }
+    //
+    // // Execute the transaction's instructions
     // pub fn execute_instructions(&self, accounts: &mut HashMap<Pubkey, Account>) {
     //     for instruction in &self.instructions {
     //         // Step 1: Get the program account associated with the instruction
@@ -121,43 +112,6 @@ impl Transaction {
     //         if !result {
     //             panic!("Instruction execution failed");
     //         }
-    //     }
-    // }
-    //
-    // pub fn verify(&self) -> bool {
-    //     let serialized_message = bincode::serialize(&self.message).unwrap();
-    //     let message_digest = hash(serialized_message);
-    //     for signature in &self.signatures {
-    //         if !signature.verify(&message_digest, &self.message.header.pubkey) {
-    //             return false;
-    //         }
-    //     }
-    //     true
-    // }
-    //
-    // pub fn serialize(&self) -> Vec<u8> {
-    //     let mut serialized_message = bincode::serialize(&self.message).unwrap();
-    //     for signature in &self.signatures {
-    //         serialized_message.extend_from_slice(&signature.to_bytes());
-    //     }
-    //     serialized_message
-    // }
-    //
-    // pub fn deserialize(bytes: &[u8]) -> Self {
-    //     let num_signatures = (bytes.len() - Message::LEN) / Signature::LEN;
-    //     let message_bytes = &bytes[..Message::LEN];
-    //     let signature_bytes = &bytes[Message::LEN..];
-    //     let mut signatures = Vec::new();
-    //     for i in 0..num_signatures {
-    //         let start = i * Signature::LEN;
-    //         let end = start + Signature::LEN;
-    //         let signature = Signature::new(signature_bytes[start..end].try_into().unwrap());
-    //         signatures.push(signature);
-    //     }
-    //     let message = bincode::deserialize(message_bytes).unwrap();
-    //     Self {
-    //         signatures,
-    //         message,
     //     }
     // }
 }

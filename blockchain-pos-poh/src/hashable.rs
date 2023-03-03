@@ -1,12 +1,16 @@
+use std::error::Error;
 use std::ops::Deref;
 use super::*;
 use rand::{rngs::OsRng, RngCore, Rng};
-// Edwards-curve(EdDSA(Elliptic Curve Digital Signature Algorithm))도 determinism을 엄격하게 준수한다.
-use ring::signature::{Ed25519KeyPair, KeyPair};
+use ring::{
+    signature::{Ed25519KeyPair, KeyPair, UnparsedPublicKey, self},
+    digest::{digest, SHA256},
+};
 use bs58::{decode, encode};
+use ring::error::Unspecified;
 
-// SHA256의 digest는 언제나 256bit [u8; 32]를 반환한다.
-// 만약 [u8; 128]을 입력으로 둔다면 중복되는 값이 존재하여 충돌하지 않을까?
+// Digest of SHA256 is always 256bit [u8; 32].
+// if [u8; 128] as an input, wouldn't there be a conflict due to duplicate values?
 
 // The reason that a hash function with an output of 32 bytes can uniquely represent
 // inputs of arbitrary size is based on a few different principles:
@@ -29,15 +33,22 @@ use bs58::{decode, encode};
 // So, the hashed result will not be the same number for different inputs,
 // even if the inputs are longer than 32 bytes.
 
+pub fn verify(pubkey: &[u8], message: &[u8], signature: &[u8]) -> Result<(), Unspecified> {
+    let pubkey = UnparsedPublicKey::new(&ED25519, pubkey);
+    pubkey.verify(message, signature)
+}
 
 pub trait Hashable {
-    fn update(&self) -> Vec<u8>; // extend bytes array.
+    // byte serializing
+    fn update(&self) -> Vec<u8>; // extend bytes array,
 
     fn finalize(&self) -> Hash {
-        let hash_to_arr = crypto_hash::digest(
-            crypto_hash::Algorithm::SHA256,
+        let hash_to_arr = digest(
+            &SHA256,
             &self.update()
         )
+            .as_ref()
+            .to_vec()
             .try_into()
             .expect("Invalid bytes to hash");
         Hash(hash_to_arr)
@@ -55,9 +66,6 @@ impl Hash {
         Self(bytes)
     }
 }
-
-
-
 
 pub struct Privatekey(Ed25519KeyPair);
 
@@ -123,6 +131,13 @@ impl Pubkey {
         Self(bytes)
     }
 }
+
+impl AsRef<[u8]> for Pubkey {
+    fn as_ref(&self) -> &[u8] {
+        &self.0[..]
+    }
+}
+
 
 impl std::fmt::Debug for Pubkey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -1,6 +1,7 @@
 use chrono::prelude::*;
-use ed25519_dalek::ed25519::Error;
-use ed25519_dalek::Verifier;
+// use ed25519_dalek::ed25519::Error;
+// use ed25519_dalek::Verifier;
+use ring::signature::{Ed25519KeyPair, UnparsedPublicKey, ED25519};
 
 pub mod block;
 pub mod blockchain;
@@ -32,15 +33,9 @@ type Signature = [u8; 64];
 
 impl Hashable for Signature {
     fn update(&self) -> Vec<u8> {
-        let mut bytes = vec![];
+        let mut bytes = Vec::new();
         bytes.extend_from_slice(self.as_ref());
         bytes
-    }
-}
-
-impl Verifier<S> for Signature {
-    fn verify(&self, msg: &[u8], signature: &Pubkey) -> Result<(), Error> {
-        todo!()
     }
 }
 
