@@ -14,6 +14,7 @@ pub mod sys;
 pub mod configmap;
 pub mod repl;
 pub mod token;
+pub mod database;
 
 pub use crate::{
     block::Block,
