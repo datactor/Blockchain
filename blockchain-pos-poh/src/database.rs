@@ -31,7 +31,9 @@ impl Database {
     }
 
     pub fn put(&mut self, key: &[u8], value: &[u8]) {
-        let mut batch = WriteBatch::default();
+        // Write operations are atomic by default
+        // 'put' operation ensure that each write is fully committed or not committed at all
+        let mut batch = WriteBatch::default(); // 개별 쓰기가 아닌 일괄 batch 처리
         batch.put(key, value);
         self.db.write_opt(batch,&self.write_opts).unwrap();
     }
@@ -57,3 +59,11 @@ impl ArcDatabase {
         db.put(key, value);
     }
 }
+
+// Todo!(); // compatcion
+// 데이터 베이스를 더 효율적인 구조를 갖게 여러 개의 작은 파일을 병합하거나 중복 데이터를 삭제함. 이것은 atomic하게 처리됨.
+// 패널티? 컴팩션 도중의 추가 cpu및 i/o resource. 당연하겠지만 compatcion 중에 lock이 걸리고 그동안 db 업데이트 불가
+// 예를 들어 압축 전에 많은 작은 SSTable이 있었다면 압축 후에 더 큰 SSTable로 병합하여 여러 개의 작은 SSTable을
+// 유지 관리하고 쿼리하는 오버헤드를 줄일 수 있다. 또한 compation은 fragmentation 줄이고, 읽기 성능을 향상시키는데
+// 도움 될 수 있음. 즉 쿼리 중에 읽어야 하는 파일 수를 줄이기 위해 더 작은 SSTable을 더 큰 SSTable로 병합하여
+// 디스크 검색을 줄이고 캐시 지역성을 개선한다.
