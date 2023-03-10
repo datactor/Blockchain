@@ -1,5 +1,8 @@
+use crate::hashable::Hash;
 use std::sync::{Arc, Mutex};
 use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions, IteratorMode, DBWithThreadMode, SingleThreaded};
+
+const NUM_SHARDS: usize = 4; // number of shards to use
 
 pub struct Database {
     db: DB,
@@ -40,24 +43,53 @@ impl Database {
 }
 
 pub struct ArcDatabase {
-    inner: Arc<Mutex<Database>>,
+    inner: Vec<Vec<Arc<Mutex<Database>>>>,
 }
 
 impl ArcDatabase {
-    pub fn new(path: &str) -> Self {
-        let inner = Arc::new(Mutex::new(Database::new(path)));
-        Self { inner }
+    pub fn new(paths: &[&str]) -> Self {
+        let mut paths = paths.to_vec();
+        paths.sort();
+        paths.dedup();
+        let num_paths = paths.len();
+        let num_extra_paths = num_paths % NUM_SHARDS;
+        let num_full_shards = NUM_SHARDS - num_extra_paths;
+        let mut shards = Vec::with_capacity(NUM_SHARDS);
+        let mut path_index = 0;
+        for i in 0..NUM_SHARDS {
+            let shard_size = if i < num_full_shards {
+                num_paths / NUM_SHARDS
+            } else {
+                num_paths / NUM_SHARDS + 1
+            };
+            let mut databases = Vec::with_capacity(shard_size);
+            for _ in 0..shard_size {
+                let database = Database::new(paths[path_index]);
+                databases.push(Arc::new(Mutex::new(database)));
+                path_index += 1;
+            }
+            shards.push(databases);
+        }
+        Self { inner: shards }
     }
 
-    pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let db = self.inner.lock().unwrap();
-        db.get(key)
-    }
-
-    pub fn put(&self, key: &[u8], value: &[u8]) {
-        let mut db = self.inner.lock().unwrap(); // MutexGuard는 패닉이 와도 락을 free.
-        db.put(key, value);
-    }
+    // fn get_index(&self, key: &[u8]) -> (usize, usize) {
+    //     let shard_index = key % self.inner.len();
+    //     let db_index = key % self.inner[shard_index].len();
+    //     (shard_index, db_index)
+    // }
+    //
+    // pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+    //     let (shard_index, db_index) = self.get_index(key);
+    //     let db = self.inner[shard_index][db_index].lock().unwrap();
+    //     db.get(key)
+    // }
+    //
+    // pub fn put(&self, key: &[u8], value: &[u8]) {
+    //     let (shard_index, db_index) = self.get_index(key);
+    //     let mut db = self.inner[shard_index][db_index].lock().unwrap(); // MutexGuard는 패닉이 와도 락을 free.
+    //     db.put(key, value); // avoids the need for external mutability by obtaining a mutable reference to the database within the scope of the lock guard.
+    // }
 }
 
 // Todo!(); // compatcion

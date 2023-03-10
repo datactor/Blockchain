@@ -55,7 +55,7 @@ pub trait Hashable {
     }
 }
 
-#[derive(Eq, Hash, PartialEq, Clone)]
+#[derive(Eq, Hash, PartialEq, Clone, Copy)]
 pub struct Hash(pub [u8; 32]);
 
 impl Hash {
