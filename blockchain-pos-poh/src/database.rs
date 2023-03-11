@@ -1,8 +1,12 @@
-use crate::hashable::Hash;
+use core::num::fmt::Part::Num;
+use std::collections::HashMap;
+use crate::{Account, Hash, Pubkey};
 use std::sync::{Arc, Mutex};
+use bs58::{encode, decode};
 use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions, IteratorMode, DBWithThreadMode, SingleThreaded};
 
-const NUM_SHARDS: usize = 4; // number of shards to use
+const NUM_SHARDS: usize = 65536; // number of shards to use
+const SHARD_PER_SHARDS: usize = 256;
 
 pub struct Database {
     db: DB,
@@ -42,54 +46,90 @@ impl Database {
     }
 }
 
+
 pub struct ArcDatabase {
     inner: Vec<Vec<Arc<Mutex<Database>>>>,
+    paths: Vec<Vec<u8>>,
 }
 
 impl ArcDatabase {
     pub fn new(paths: &[&str]) -> Self {
-        let mut paths = paths.to_vec();
-        paths.sort();
-        paths.dedup();
-        let num_paths = paths.len();
-        let num_extra_paths = num_paths % NUM_SHARDS;
-        let num_full_shards = NUM_SHARDS - num_extra_paths;
-        let mut shards = Vec::with_capacity(NUM_SHARDS);
-        let mut path_index = 0;
+        let mut shards = vec![];
+        let mut shard = vec![];
         for i in 0..NUM_SHARDS {
-            let shard_size = if i < num_full_shards {
-                num_paths / NUM_SHARDS
-            } else {
-                num_paths / NUM_SHARDS + 1
-            };
-            let mut databases = Vec::with_capacity(shard_size);
-            for _ in 0..shard_size {
-                let database = Database::new(paths[path_index]);
-                databases.push(Arc::new(Mutex::new(database)));
-                path_index += 1;
+            if i > 0 && i % SHARD_PER_SHARDS == 0 {
+                shards.push(shard);
+                shard = vec![];
             }
-            shards.push(databases);
+            shard.push(Arc::new(Mutex::new(Database::new(paths[i % paths.len()]))));
         }
-        Self { inner: shards }
+
+        shards.push(shard);
+
+        Self {
+            inner: shards,
+            paths: paths.iter().map(|p| decode(p).into_vec().unwrap()).collect(),
+        }
     }
 
-    // fn get_index(&self, key: &[u8]) -> (usize, usize) {
-    //     let shard_index = key % self.inner.len();
-    //     let db_index = key % self.inner[shard_index].len();
-    //     (shard_index, db_index)
-    // }
-    //
-    // pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-    //     let (shard_index, db_index) = self.get_index(key);
-    //     let db = self.inner[shard_index][db_index].lock().unwrap();
-    //     db.get(key)
-    // }
-    //
-    // pub fn put(&self, key: &[u8], value: &[u8]) {
-    //     let (shard_index, db_index) = self.get_index(key);
-    //     let mut db = self.inner[shard_index][db_index].lock().unwrap(); // MutexGuard는 패닉이 와도 락을 free.
-    //     db.put(key, value); // avoids the need for external mutability by obtaining a mutable reference to the database within the scope of the lock guard.
-    // }
+    fn get_index(&self, key: &[u8]) -> Option<(usize, usize)> {
+        let shard_index = key[0] as usize % NUM_SHARDS;
+        let mut path_index = None;
+        for i in 0..self.paths.len() {
+            if self.inner[NUM_SHARDS + i][shard_index].len() > 0 {
+                path_index = Some(i);
+                break;
+            }
+        }
+        if let Some(i) = path_index {
+            let db_index = (key[1] as usize) % self.inner[NUM_SHARDS + i][shard_index].len();
+            Some((NUM_SHARDS + i, db_index))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, account_id: &[u8]) -> Option<Vec<u8>> {
+        if let Some((path_index, db_index)) = self.get_index(account_id) {
+            let db = self.inner[path_index][db_index].lock().unwrap();
+            db.get(account_id)
+        } else {
+            None
+        }
+    }
+
+    pub fn put(&self, account_id: &[u8], value: &[u8]) {
+        if let Some((path_index, db_index)) = self.get_index(account_id) {
+            let mut db = self.inner[path_index][db_index].lock().unwrap();
+            db.put(account_id, value);
+        }
+    }
+
+    pub fn add_path(&mut self, path: &str) {
+        self.inner.push(vec![Arc::new(Mutex::new(Database::new(path))); NUM_SHARDS]);
+        self.paths.push(decode(path).into_vec().unwrap());
+    }
+
+    pub fn remove_path(&mut self, path: &str) {
+        if let Some(i) = self.paths.iter().position(|p| p == path) {
+            for shard in &self.inner[NUM_SHARDS + i] {
+                for db in shard {
+                    db.lock().unwrap().clear();
+                }
+            }
+            self.inner.drain(NUM_SHARDS + i..NUM_SHARDS + i + 1);
+            self.paths.remove(i);
+        }
+    }
+
+    pub fn move_shard(&mut self, shard_index: usize, from_path: &str, to_path: &str) {
+        if let Some(from_i) = self.paths.iter().position(|p| p == from_path) {
+            if let Some(to_i) = self.paths.iter().position(|p| p == to_path) {
+                let db = self.inner[NUM_SHARDS + from_i][shard_index].remove(0);
+                self.inner[NUM_SHARDS + to_i][shard_index].push(db);
+            }
+        }
+    }
 }
 
 // Todo!(); // compatcion
@@ -99,3 +139,29 @@ impl ArcDatabase {
 // 유지 관리하고 쿼리하는 오버헤드를 줄일 수 있다. 또한 compation은 fragmentation 줄이고, 읽기 성능을 향상시키는데
 // 도움 될 수 있음. 즉 쿼리 중에 읽어야 하는 파일 수를 줄이기 위해 더 작은 SSTable을 더 큰 SSTable로 병합하여
 // 디스크 검색을 줄이고 캐시 지역성을 개선한다.
+
+
+pub struct SysDatabase {
+    db: DB,
+}
+
+impl SysDatabase {
+    pub fn new(path: &str) -> Self {
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        let db = DB::open(&opts, path).unwrap();
+        Self { db }
+    }
+
+    pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        self.db.get(key).unwrap().map(|v| v.to_vec())
+    }
+
+    pub fn put(&self, key: &[u8], value: &[u8]) {
+        self.db.put(key, value).unwrap();
+    }
+
+    pub fn delete(&self, key: &[u8]) {
+        self.db.delete(key).unwrap();
+    }
+}
