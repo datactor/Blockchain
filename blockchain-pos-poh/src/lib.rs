@@ -1,6 +1,3 @@
-extern crate core;
-extern crate core;
-
 use chrono::prelude::*;
 // use ed25519_dalek::ed25519::Error;
 // use ed25519_dalek::Verifier;

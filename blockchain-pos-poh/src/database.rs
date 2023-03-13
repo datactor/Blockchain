@@ -6,8 +6,8 @@ use rocksdb::{
     DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions, IteratorMode, DBWithThreadMode, SingleThreaded,
 };
 
-const NUM_SHARDS: usize = 256; // number of shards to use
-const SHARDS_PER_PATH: usize = 8;
+const NUM_SHARDS: usize = 4096;
+const SHARDS_PER_PATH: usize = 32;
 
 pub struct Database {
     db: DB,
@@ -46,7 +46,6 @@ impl Database {
         self.db.write_opt(batch,&self.write_opts).unwrap();
     }
 }
-
 
 pub struct ArcDatabase {
     inner: Vec<Vec<Arc<Mutex<Database>>>>,
@@ -236,33 +235,72 @@ impl TokenDB {
     }
 }
 
-pub fn merge_db(input_dbs: &[&str], num_shards: usize, shard_path: &str) {
-    let mut shard_dbs = Vec::with_capacity(num_shards);
+pub fn merge_db(input_dbs: &[&str], shard_size: usize, shard_paths: &[&str]) {
+    let mut shard_dbs = Vec::new();
     let mut shard_opts = Options::default();
     shard_opts.create_if_missing(true);
 
-    // Create and open all shard databases
-    for i in 0..num_shards {
-        let shard_path = format!("{}_shard_{}", shard_path, i);
-        let db = DB::open(&shard_opts, &shard_path).unwrap();
-        shard_dbs.push(db);
+    let mut last_shard_index = 0;
+    let mut last_shard_capacity = 0;
+    let mut shard_count = 0;
+
+    // Try to open all existing shards
+    for shard_path in shard_paths {
+        while let Ok(db) = DB::open(&shard_opts, format!("{}_shard_{}", shard_path, shard_count)) {
+            shard_dbs.push(db);
+            last_shard_index = shard_count;
+            shard_count += 1;
+        }
     }
 
-    // Merge column families from all input databases into shard databases
+    // If no shards exist, create the first one
+    if shard_dbs.is_empty() {
+        let db = DB::open(&shard_opts, format!("{}_shard_{}", shard_path, shard_count)).unwrap();
+        shard_dbs.push(db);
+    } else {
+        // Get the last shard's capacity to initialize last_shard_capacity
+        let last_shard = shard_dbs.last().unwrap();
+        last_shard_capacity = last_shard.get_property_int_value("rocksdb.cur-size-all-mem-tables").unwrap() as usize;
+    }
+
+    // Merge all input databases into shard databases
+    let mut shards_per_path = vec![shard_count / shard_paths.len(); shard_paths.len()];
+    let mut current_path_index = 0;
     for input_db_path in input_dbs {
         let input_opts = Options::default();
         let input_db = DB::open(&input_opts, input_db_path).unwrap();
         let mut iter = input_db.iterator(IteratorMode::Start);
 
         while let Some(Ok((key, value))) = iter.next() {
-            let shard_index = calculate_shard_index(key.as_slice(), num_shards);
-            let mut shard_db = &shard_dbs[shard_index];
+            let shard_path = shard_paths[current_path_index];
+
+            // let shard_index = calculate_shard_index(&key.to_vec().to_vec()[..], shard_dbs.len(), shard_size, last_shard_index, last_shard_capacity);
+            // let mut shard_db = shard_dbs.get_mut(shard_index).unwrap();
+            let shard_index = calculate_shard_index(&key.to_vec().to_vec()[..], shards_per_path[current_path_index], shard_size, last_shard_index, last_shard_capacity);
+            let mut shard_db = shard_dbs.get_mut(shard_index).unwrap();
+
 
             let mut batch = WriteBatch::default();
-            batch.put(key.as_slice(), value.as_slice());
+            batch.put(&key.to_vec()[..], &value.to_vec()[..]);
 
             let write_opts = WriteOptions::default();
             shard_db.write_opt(batch, &write_opts).unwrap();
+
+            // Update last shard index and capacity
+            last_shard_index = shard_index;
+            last_shard_capacity += value.len();
+
+            // If last shard is full, create a new one
+            if last_shard_capacity >= shard_size {
+                last_shard_capacity = 0;
+                shard_count += 1;
+                if shard_count % SHARDS_PER_PATH == 0 {
+                    current_path_index = (current_path_index + 1) % shard_paths.len();
+                    shards_per_path[current_path_index] += 1;
+                }
+                let db = DB::open(&shard_opts, format!("{}_shard_{}", shard_path, shard_count)).unwrap();
+                shard_dbs.push(db);
+            }
         }
     }
 
@@ -274,7 +312,36 @@ pub fn merge_db(input_dbs: &[&str], num_shards: usize, shard_path: &str) {
 
 // Helper function to calculate shard index based on column family name
 // 해싱하지 않으면 u256값을 사용해야함.
-fn calculate_shard_index(key: &[u8], num_shards: usize) -> usize {
-    let hash = farmhash::hash64(key);
-    (hash as usize) % num_shards
+fn calculate_shard_index(key: &[u8], num_shards: usize, shard_size: usize, last_shard_idx: usize, last_shard_capacity: usize) -> usize {
+    let mut shard_idx = (farmhash::hash64(key) as usize) % num_shards;
+
+    // Calculate the total capacity of the current shard
+    let mut total_shard_capacity = (shard_idx + 1) * shard_size;
+    if shard_idx == last_shard_idx {
+        total_shard_capacity -= last_shard_capacity;
+    }
+
+    // If the current shard is full, find the next available shard
+    while total_shard_capacity < key.len() {
+        shard_idx = (shard_idx + 1) % num_shards;
+        total_shard_capacity = (shard_idx + 1) * shard_size;
+        if shard_idx == last_shard_idx {
+            total_shard_capacity -= last_shard_capacity;
+        }
+    }
+    shard_idx
 }
+
+// todo!
+// 1. shard_dbs에 대해 일반 Vec 대신 Arc<Mutex>를 사용하면 여러 스레드가 동일한 벡터에 액세스할 때 스레드
+// 안전성을 꾀하기
+//
+// 2. calculate_shard_index 함수 내에서 샤드의 순차 인덱스와 정확한 용량을 정확하게 계산하기 위해 각 샤드의
+// 현재 용량을 추적하는 B-트리와 같은 데이터 구조를 사용하는 것을 고려. 이렇게 하려면 키-값 쌍이 샤드에 기록될
+// 때마다 용량을 업데이트해야 한다.
+//
+// 3. 고정 크기 샤드를 생성하는 대신 데이터의 실제 크기를 기반으로 샤드 생성을 고려.
+// 예를 들어, 단일 샤드를 생성하여 시작할 수 있으며, 채워지면 데이터를 수용하기 위해 동적으로 새 샤드를 생성.
+// 이렇게 하면 저장 공간을 보다 효율적으로 사용 가능
+//
+// 4. error handling, logging framework 사용용
