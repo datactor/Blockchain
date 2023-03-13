@@ -1,12 +1,13 @@
-use core::num::fmt::Part::Num;
 use std::collections::HashMap;
 use crate::{Account, Hash, Pubkey};
 use std::sync::{Arc, Mutex};
 use bs58::{encode, decode};
-use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions, IteratorMode, DBWithThreadMode, SingleThreaded};
+use rocksdb::{
+    DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions, IteratorMode, DBWithThreadMode, SingleThreaded,
+};
 
-const NUM_SHARDS: usize = 65536; // number of shards to use
-const SHARD_PER_SHARDS: usize = 256;
+const NUM_SHARDS: usize = 256; // number of shards to use
+const SHARDS_PER_PATH: usize = 8;
 
 pub struct Database {
     db: DB,
@@ -141,27 +142,139 @@ impl ArcDatabase {
 // 디스크 검색을 줄이고 캐시 지역성을 개선한다.
 
 
-pub struct SysDatabase {
+pub struct AccountDB {
     db: DB,
+    read_opts: ReadOptions,
+    write_opts: WriteOptions,
 }
 
-impl SysDatabase {
+impl AccountDB {
     pub fn new(path: &str) -> Self {
-        let mut opts = Options::default();
-        opts.create_if_missing(true);
-        let db = DB::open(&opts, path).unwrap();
-        Self { db }
+        let db_opts = Options::default();
+        let db = DB::open(&db_opts, path).unwrap();
+        let read_opts = ReadOptions::default();
+
+        let write_opts = WriteOptions::default();
+        Self {
+            db,
+            read_opts,
+            write_opts
+        }
     }
 
     pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.db.get(key).unwrap().map(|v| v.to_vec())
+        self.db.get_opt(key, &self.read_opts).unwrap()
     }
 
-    pub fn put(&self, key: &[u8], value: &[u8]) {
-        self.db.put(key, value).unwrap();
+    pub fn put(&mut self, key: &[u8], value: &[u8]) {
+        let mut batch = WriteBatch::default();
+        batch.put(key, value);
+        self.db.write_opt(batch,&self.write_opts).unwrap();
+    }
+}
+
+
+pub struct SysDB {
+    db: DB,
+    read_opts: ReadOptions,
+    write_opts: WriteOptions,
+}
+
+impl SysDB {
+    pub fn new(path: &str) -> Self {
+        let db_opts = Options::default();
+        let db = DB::open(&db_opts, path).unwrap();
+        let read_opts = ReadOptions::default();
+
+        let write_opts = WriteOptions::default();
+        Self {
+            db,
+            read_opts,
+            write_opts
+        }
     }
 
-    pub fn delete(&self, key: &[u8]) {
-        self.db.delete(key).unwrap();
+    pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        self.db.get_opt(key, &self.read_opts).unwrap()
     }
+
+    pub fn put(&mut self, key: &[u8], value: &[u8]) {
+        let mut batch = WriteBatch::default();
+        batch.put(key, value);
+        self.db.write_opt(batch,&self.write_opts).unwrap();
+    }
+}
+
+pub struct TokenDB {
+    db: DB,
+    read_opts: ReadOptions,
+    write_opts: WriteOptions,
+}
+
+impl TokenDB {
+    pub fn new(path: &str) -> Self {
+        let db_opts = Options::default();
+        let db = DB::open(&db_opts, path).unwrap();
+        let read_opts = ReadOptions::default();
+
+        let write_opts = WriteOptions::default();
+        Self {
+            db,
+            read_opts,
+            write_opts
+        }
+    }
+
+    pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        self.db.get_opt(key, &self.read_opts).unwrap()
+    }
+
+    pub fn put(&mut self, key: &[u8], value: &[u8]) {
+        let mut batch = WriteBatch::default();
+        batch.put(key, value);
+        self.db.write_opt(batch,&self.write_opts).unwrap();
+    }
+}
+
+pub fn merge_db(input_dbs: &[&str], num_shards: usize, shard_path: &str) {
+    let mut shard_dbs = Vec::with_capacity(num_shards);
+    let mut shard_opts = Options::default();
+    shard_opts.create_if_missing(true);
+
+    // Create and open all shard databases
+    for i in 0..num_shards {
+        let shard_path = format!("{}_shard_{}", shard_path, i);
+        let db = DB::open(&shard_opts, &shard_path).unwrap();
+        shard_dbs.push(db);
+    }
+
+    // Merge column families from all input databases into shard databases
+    for input_db_path in input_dbs {
+        let input_opts = Options::default();
+        let input_db = DB::open(&input_opts, input_db_path).unwrap();
+        let mut iter = input_db.iterator(IteratorMode::Start);
+
+        while let Some(Ok((key, value))) = iter.next() {
+            let shard_index = calculate_shard_index(key.as_slice(), num_shards);
+            let mut shard_db = &shard_dbs[shard_index];
+
+            let mut batch = WriteBatch::default();
+            batch.put(key.as_slice(), value.as_slice());
+
+            let write_opts = WriteOptions::default();
+            shard_db.write_opt(batch, &write_opts).unwrap();
+        }
+    }
+
+    // Compact all shard databases to optimize storage
+    for shard_db in &shard_dbs {
+        shard_db.compact_range(None::<&[u8]>, None::<&[u8]>); // 'None' compacts the entire database by default
+    }
+}
+
+// Helper function to calculate shard index based on column family name
+// 해싱하지 않으면 u256값을 사용해야함.
+fn calculate_shard_index(key: &[u8], num_shards: usize) -> usize {
+    let hash = farmhash::hash64(key);
+    (hash as usize) % num_shards
 }
