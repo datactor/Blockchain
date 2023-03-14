@@ -161,3 +161,107 @@ The software that can run different types of nodes on your blockchain, such as f
 The software that can manage private keys and interact with your blockchain.
 #### Development tools
 The tools and libraries that can be used for developing and deploying smart contracts, interacting with the blockchain, and testing the network.
+
+
+### Todo!();
+이 코드는 샤딩되지 않은 input_dbs를 기존의 샤딩된 샤드들 중 완전하지 않은 샤드 1개와 결합해서 새로운 샤드를 만들고,
+계속해서 새로운 샤드들을 추가로 만들거나, 기존의 샤딩된 샤드들이 없다면 새롭게 input_dbs들을 샤드로 나누는 작업임.
+
+내생각에 몇가지 문제가 있음.
+1. 
+```rust
+// Try to open all existing shards
+for shard_path in shard_paths {
+    while let Ok(db) = DB::open(&shard_opts, format!("{}_shard_{}", shard_path, shard_count)) {
+        shard_dbs.push(db); 
+        last_shard_index = shard_count;
+        shard_count += 1;
+    }
+}
+```
+
+위의 코드에서 이미 생성된 샤드들이라면 미리 모든 샤드들을 가져올 필요는 없어.
+완전하지 않은 샤드 하나만 가져오면 되고.
+즉 샤드들이 존재한다면,
+shard_paths들에 샤드가 존재한다면(이 부분은 파일/폴더 읽기 시스템을 사용해서 읽는 것이 좋겠지 않을까?),
+순차적으로 샤드를 추가했다면, 0부터 시작해서 마지막 샤드 순으로 추가되었을테니까,
+shard_path별로 마지막 인덱스의 샤드들의 내부만 열어봐서,
+```rust
+let max_shard_cap = 200_000_000; // Maximum capacity per shard
+let mut last_shard_name = String::new();
+// find insufficient shard
+for shard_path in shard_paths {
+    // After getting the list of folders in "shard_path" with the OS command,
+    // set the last index file name as last_shard_name
+    let Some(tmp_shard_name) = todo!(); {
+        let last_shard_opts = Options::default();
+        let last_shard = DB::open(&last_shard_opts, tmp_shard_name).unwrap();
+        let mut tmp_capacity = 0;
+        let mut last = last_shard.iterator(IteratorMode::Start);
+        while let Some(Ok((key, value))) = last.next() {
+            tmp_capacity += value.len();
+        }
+        if tmp_capacity < max_shard_cap {
+            last_shard_capacity = tmp_capacity;
+            last_shard_name = tmp_shard_name;
+        }
+    }
+}
+```
+위의 코드를 거쳤다면,
+last_shard_capacity가 밝혀졌을 것이다(초기값인 0 아니면 기존의 insufficient shard의 값)
+그리고 last_shard_name도 규칙에 의해 순차적으로 저장될 위치이거나 insufficient shard로 변경되었을것임.
+
+그렇다면 이제
+shard_dbs에 push하면 된다.
+
+```rust
+let db = DB::open(&shard_opts, last_shard_name).unwrap();
+shard_dbs.push(db);
+```
+
+이 시점에서 shard_dbs 내에는 반드시 하나의 샤드만 존재.
+
+
+그 이후에
+```rust
+    // Merge all input databases into shard databases
+    let mut shards_per_path = vec![shard_count / shard_paths.len(); shard_paths.len()];
+    let mut current_path_index = 0;
+    for input_db_path in input_dbs {
+        let input_opts = Options::default();
+        let input_db = DB::open(&input_opts, input_db_path).unwrap();
+        let mut iter = input_db.iterator(IteratorMode::Start);
+
+        while let Some(Ok((key, value))) = iter.next() {
+            let shard_path = shard_paths[current_path_index];
+
+            let shard_index = calculate_shard_index(&key.to_vec().to_vec()[..], shards_per_path[current_path_index], shard_size, last_shard_index, last_shard_capacity);
+            let mut shard_db = shard_dbs.get_mut(shard_index).unwrap();
+
+
+            let mut batch = WriteBatch::default();
+            batch.put(&key.to_vec()[..], &value.to_vec()[..]);
+
+            let write_opts = WriteOptions::default();
+            shard_db.write_opt(batch, &write_opts).unwrap();
+
+            // Update last shard index and capacity
+            last_shard_index = shard_index;
+            last_shard_capacity += value.len();
+
+            // If last shard is full, create a new one
+            if last_shard_capacity >= shard_size {
+                last_shard_capacity = 0;
+                shard_count += 1;
+                if shard_count % SHARDS_PER_PATH == 0 {
+                    current_path_index = (current_path_index + 1) % shard_paths.len();
+                    shards_per_path[current_path_index] += 1;
+                }
+                let db = DB::open(&shard_opts, format!("{}_shard_{}", shard_path, shard_count)).unwrap();
+                shard_dbs.push(db);
+            }
+        }
+    }
+```
+위의 코드로 샤드들을 추가
