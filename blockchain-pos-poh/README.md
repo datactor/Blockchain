@@ -167,7 +167,7 @@ The tools and libraries that can be used for developing and deploying smart cont
 이 코드는 샤딩되지 않은 input_dbs를 기존의 샤딩된 샤드들 중 완전하지 않은 샤드 1개와 결합해서 새로운 샤드를 만들고,
 계속해서 새로운 샤드들을 추가로 만들거나, 기존의 샤딩된 샤드들이 없다면 새롭게 input_dbs들을 샤드로 나누는 작업임.
 
-내생각에 몇가지 문제가 있음.
+몇가지 문제가 있어보인다.
 1. 
 ```rust
 // Try to open all existing shards
@@ -285,3 +285,71 @@ shard_dbs.push(db);
       리소스사용과 확장성의 균형을 맞춰보자.
    
    4번으로 가보자
+
+
+3. shard Option
+
+shard를 연다는것은 두가지 경우인데,
+단순히 읽고 account_ID에 대한 정보를 가져오거나,
+account_ID의 정보를 변경 또는 추가하거나 두 경우이다.
+
+그렇다면 update_shard와,
+read_shard를 사용해야 할까?
+update_shard일 경우 writeOption을 사용하고,
+read를 쓸경우 readOption을 사용하고.
+
+예를 들어서 로그인을 해서 기본적으로 readOption으로 가져왔으면,
+tx나 id생성, stake등의 이슈가 있을때는 write_option으로 다시 가져와야하잖아?
+이렇게 할 바에 처음부터 write_option으로 가져오는게 나을까?
+
+그렇지만 처음부터 write_option으로 가져오면,
+WAL, sync, lock등의 오버헤드가 많이 생긴다.
+
+- rocksDB에서는 set_option() 메서드를 사용해서
+이미 열려있는 db 인스턴스의 쓰기 옵션을 변경할 수 있다.
+그러므로 기본적으로 read_option으로 가져오고, 필요한 경우에만
+write_option을 사용하도록 하자.
+
+
+#### 3월 18일 
+
+##### ShardPath와 Database의 관계 정리
+
+먼저 ShardPath부터 들어가보자.
+
+1. new() -> 만들수 있는 최대의 샤드를 인덱싱해서 해시맵으로 올려놓음. 아직 실제 database는 만들지 않았음.
+2. get_shard() -> 불러올 shard의 위치를 반환해준다.
+
+3. add_shard() -> 이미 new()에서 만들 수 있는 최대의 샤드 리스트가 정해졌기때문에
+   call 되는 순간은 scale-out 등의 이슈가 있을 때 뿐이다. 이를 수행하면, indexing을 필수적으로 한번 더 수행해야함.
+
+4. index_shard() -> 리밸런싱 주기나, scale out등의 이슈가 있을 때 수행한다.
+
+5. remove_shard() -> 기존의 샤드를 제거한다. 다른 곳에 옮겼을 경우에만 수행한다. 성공적으로 지워지면 indexing 필수.
+
+6. move_shard() -> 샤드의 path를 변경할 때 수행한다. 옮기고 나서 remove_shard()를 수행한다.
+
+여기까지가 shardPath 메소드의 역할이고,
+
+database의 역할을 보자.
+
+1. get() -> 샤드path에서 정해진 인덱스에 대한 샤드를 불러온다. 즉, ShardPath::get_shard() 메소드의 서브루틴 함수이다.
+   없다면 options.create_if_missing(true); 명령으로 생성한다. 때문에 new() method가 필요없다.
+
+2. put() -> get으로 가져온 실제 database에 lock을 걸고 write_option으로 변경하여, db를 업데이트한다.
+   여기서 추가해야할 기능은, shard의 capacity를 찾고, batch로 올렸을 경우에 capacity가 넘치지 않는 경우에만 batch한다.
+   넘칠 위험이 있는 경우 다음 인덱스의 샤드를 ShardPath::get_shard() 메소드로 가져와서 분배한다.
+   어떻게 분배해야 할까?
+   (1) 샤드에 데이터 하나씩 batch하는 경우
+   분배가 아닌 다음 샤드로 넘긴다.
+   (2) 샤드에 데이터가 여러개 batch되는 경우(이러한 경우는 queue로 업데이트 요청을 지연시켜서 일괄처리 하지 않는 이상 없다.)
+   어떤 방법이 효율적일지 모르지만 쉬운 방법은, 다중데이터의 batch를 취소하고
+   개별데이터 batch 요청으로 전환해서 들어갈만큼 넣고, 꽉차면 다음 샤드로 넘긴다.
+
+3. remove_database() -> 기존의 샤드를 제거한다. remove_shard()의 서브루틴으로 지정한다.
+   데이터가 옮겨졌을 경우가 확인 될 때만, remove를 수행한다. 여기서 옮겨진 데이터베이스를 한번더 불러와서 double check한다.
+
+// 4. move_database() -> 새로운 path에 샤드를 생성하는 절차는 여기서는 필요없다. get() 메서드로 저절로 생성시킬 수 있다.
+
+// 5. index_database() -> 여기서 ShardPath::index_shard() 메서드는 샤드의 위치는 고정하고 index만 변경하는 것이기 때문에,
+//    database에서 index_shard() 메서드를 수행할 필요는 없다.
