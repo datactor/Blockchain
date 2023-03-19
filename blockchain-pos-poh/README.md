@@ -353,3 +353,16 @@ database의 역할을 보자.
 
 // 5. index_database() -> 여기서 ShardPath::index_shard() 메서드는 샤드의 위치는 고정하고 index만 변경하는 것이기 때문에,
 //    database에서 index_shard() 메서드를 수행할 필요는 없다.
+
+#### 3월 19일
+
+##### ShardPath::new() 구현
+
+##### ShardPath::index_shards() 구현
+데이터 지역성(hotspot) 방지, 결정론적, 확장성 유지
+샤드와 path가 동적일 경우에도 샤드index에 대해서 결정적임을 보증하면서,
+추가적인 리소스 낭비를 줄이기 위해 accountID를 shard index로 사용하는 range sharding 사용한다.
+또한 accountID를 해싱하여 노드 집합간에 키를 배포함으로써 데이터를 고르게 분산시켜
+핫스팟을 방지하는데 도움을 준다. 또한 해시 링에서 노드를 동적으로 추가 및 제거할 수 있으므로,
+확장성 향상과, 데이터의 균형을 재조정할 수 있게 한다.
+
