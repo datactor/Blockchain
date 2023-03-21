@@ -366,3 +366,9 @@ database의 역할을 보자.
 핫스팟을 방지하는데 도움을 준다. 또한 해시 링에서 노드를 동적으로 추가 및 제거할 수 있으므로,
 확장성 향상과, 데이터의 균형을 재조정할 수 있게 한다.
 
+##### dive to consistentHashRing
+https://github.com/datactor/rust-problem-solving/blob/main/forge/distributed_data_management/consistentHashRing.md
+
+#### 3월 20일
+
+##### dive to JumpConsiste
