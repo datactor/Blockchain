@@ -369,6 +369,12 @@ database의 역할을 보자.
 ##### dive to consistentHashRing
 https://github.com/datactor/rust-problem-solving/blob/main/forge/distributed_data_management/consistentHashRing.md
 
-#### 3월 20일
+#### 3월 20일 - 21일
 
-##### dive to JumpConsiste
+##### dive to JumpConsistentHashRing
+https://github.com/datactor/rust-problem-solving/blob/main/forge/distributed_data_management/jumpConsHash.md
+
+#### 3월 22일
+
+##### Update the dive to sharding
+https://github.com/datactor/rust-problem-solving/blob/main/forge/distributed_data_management/sharding.md
