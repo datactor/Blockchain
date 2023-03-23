@@ -378,3 +378,44 @@ https://github.com/datactor/rust-problem-solving/blob/main/forge/distributed_dat
 
 ##### Update the dive to sharding
 https://github.com/datactor/rust-problem-solving/blob/main/forge/distributed_data_management/sharding.md
+
+#### 3월 23일
+
+##### Update the get_shard() method
+
+##### Implementing the rebuild_path() method
+
+##### move_shard()
+Consistent Hash Ring을 사용하기 때문에 account_id의 분포에 따른
+move 메소드는 필수적이지 않다. 그렇지만 인기 있는 account와 인기없는 account의
+차이에 따른 로드 차이는 Consistent Hash로 해결할 수 없다.
+이럴 때 move_shard()로 샤드의 위치를 옮겨준다. 이것은 account별 데이터 쿼리요청량에 따라서 알고리즘을 설계하고
+동적 로드밸런싱을 구현해야 하기 때문에 현재 단계에서는 적절하지 않다.
+
+직접적으로 리소스를 사용하는 것은 shard가 아니라 node, 즉 path이기 때문에
+가장 로드가 많이 걸리는 path내부의 가장 큰 로드의 shard와,
+가장 로드가 적게 걸리는 path내부의 가장 적은 로드의 shard를 맞교환하는 식으로 구현한다.
+
+move shard에 대한 몇가지 기준은 다음과 같다.
+1. 로드가 높은 샤드를 로드가 낮은 노드로 이동하여 시스템 전체의 로드 균형을 조정한다.
+2. 더 빠른 디스크 액세스 또는 더 많은 사용 가능한 메모리와 같은 더 나은 성능 특성을 가진 노드로 샤드를 이동시킨다.
+3. 네트워크 대기 시간을 줄이기 위해 대부분의 사용자에게 지리적으로 더 가까운 노드로 샤드를 이동시킨다.
+4. 급증하는 수요를 처리하기 위해 샤드를 CPU 또는 대역폭과 같은 사용 가능한 리소스가 더 많은 노드로 이동시킨다.
+5. 네트워크 혼잡이 적거나 네트워크 오류가 적은 노드로 샤드를 이동시킨다.
+
+추후에 머신러닝 등을 통해서 예측 동적 로드밸런싱 자동화에 대해서 알아보자.
+
+##### remove_shard()
+remove_shard() 역시 마찬가지이다. 현재 입장에서는 필수적이지 않은 기능이다.
+추후에 move_shard()메소드가 구현 되었을때 고려하자
+
+##### Modifying the index_shards() method
+기존의 방식은 indexing마다 ConsistentHashRing 초기화였으나,
+deterministic이 불안해지고 불필요한 계산 오버헤드가 생김.
+
+ShardPathd::new()에서 ConsistentHashRing을 초기화하고
+indexing에서는 생성된 ConsistentHashRing을 불러와서 수정하는 방식으로 변경.
+Shard는 ConsistentHashRing에서는 node이기 때문에 shard가 추가되는
+rebuild_path() 단계에서만 노드 추가.
+
+
