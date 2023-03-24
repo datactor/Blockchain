@@ -1,12 +1,15 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fs,
+    sync::{Arc, Mutex},
+};
 use crate::{Account, Hash, Pubkey};
-use std::sync::{Arc, Mutex};
 use bs58::{encode, decode};
 use rocksdb::{
     DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions, IteratorMode, DBWithThreadMode, SingleThreaded,
 };
 
-const NUM_SHARDS: usize = 4096;
+const NUM_SHARDS: usize = 128;
 const SHARDS_PER_PATH: usize = 32;
 
 pub struct Database {
@@ -48,88 +51,56 @@ impl Database {
 }
 
 pub struct ArcDatabase {
-    inner: Vec<Vec<Arc<Mutex<Database>>>>,
-    paths: Vec<Vec<u8>>,
+    inner: Arc<Mutex<Database>>,
 }
 
 impl ArcDatabase {
-    pub fn new(paths: &[&str]) -> Self {
-        let mut shards = vec![];
-        let mut shard = vec![];
-        for i in 0..NUM_SHARDS {
-            if i > 0 && i % SHARD_PER_SHARDS == 0 {
-                shards.push(shard);
-                shard = vec![];
-            }
-            shard.push(Arc::new(Mutex::new(Database::new(paths[i % paths.len()]))));
-        }
-
-        shards.push(shard);
-
+    pub fn new(path: &str) -> Self {
         Self {
-            inner: shards,
-            paths: paths.iter().map(|p| decode(p).into_vec().unwrap()).collect(),
+            inner: Arc::new(Mutex::new(Database::new(path))),
         }
     }
 
-    fn get_index(&self, key: &[u8]) -> Option<(usize, usize)> {
-        let shard_index = key[0] as usize % NUM_SHARDS;
-        let mut path_index = None;
-        for i in 0..self.paths.len() {
-            if self.inner[NUM_SHARDS + i][shard_index].len() > 0 {
-                path_index = Some(i);
-                break;
-            }
-        }
-        if let Some(i) = path_index {
-            let db_index = (key[1] as usize) % self.inner[NUM_SHARDS + i][shard_index].len();
-            Some((NUM_SHARDS + i, db_index))
-        } else {
-            None
-        }
+    fn get_shard_index(&self, key: &[u8]) -> usize {
+        (key[0] as usize) % NUM_SHARDS
     }
 
     pub fn get(&self, account_id: &[u8]) -> Option<Vec<u8>> {
-        if let Some((path_index, db_index)) = self.get_index(account_id) {
-            let db = self.inner[path_index][db_index].lock().unwrap();
-            db.get(account_id)
-        } else {
-            None
-        }
+        let shard_index = self.get_shard_index(account_id);
+        let db = self.inner.lock().unwrap();
+        db.get(account_id)
     }
 
     pub fn put(&self, account_id: &[u8], value: &[u8]) {
-        if let Some((path_index, db_index)) = self.get_index(account_id) {
-            let mut db = self.inner[path_index][db_index].lock().unwrap();
-            db.put(account_id, value);
-        }
+        let shard_index = self.get_shard_index(account_id);
+        let mut db = self.inner.lock().unwrap();
+        db.put(account_id, value);
     }
 
-    pub fn add_path(&mut self, path: &str) {
-        self.inner.push(vec![Arc::new(Mutex::new(Database::new(path))); NUM_SHARDS]);
-        self.paths.push(decode(path).into_vec().unwrap());
-    }
-
-    pub fn remove_path(&mut self, path: &str) {
-        if let Some(i) = self.paths.iter().position(|p| p == path) {
-            for shard in &self.inner[NUM_SHARDS + i] {
-                for db in shard {
-                    db.lock().unwrap().clear();
-                }
-            }
-            self.inner.drain(NUM_SHARDS + i..NUM_SHARDS + i + 1);
-            self.paths.remove(i);
-        }
-    }
-
-    pub fn move_shard(&mut self, shard_index: usize, from_path: &str, to_path: &str) {
-        if let Some(from_i) = self.paths.iter().position(|p| p == from_path) {
-            if let Some(to_i) = self.paths.iter().position(|p| p == to_path) {
-                let db = self.inner[NUM_SHARDS + from_i][shard_index].remove(0);
-                self.inner[NUM_SHARDS + to_i][shard_index].push(db);
-            }
-        }
-    }
+    // pub fn remove_path(&mut self, path: &str) {
+    //     self.shard_path.remove_path(path);
+    //     let shard_indexes = self.shard_path.get_shard_indexes_for_path(path);
+    //     if shard_indexes.contains(&self.get_shard_index(&[])) {
+    //         return;
+    //     }
+    //     let db_path = self.shard_path.get_path_for_shard_index(shard_indexes[0]);
+    //     let db = Arc::new(Mutex::new(Database::new(&db_path)));
+    //     self.inner = db;
+    // }
+    //
+    // pub fn move_shard(&mut self, _shard_index: usize, from_path: &str, to_path: &str) {
+    //     if from_path == to_path {
+    //         return;
+    //     }
+    //     let from_shard_index = self.shard_path.get_shard_indexes_for_path(from_path)[0];
+    //     let to_shard_index = self.shard_path.get_shard_indexes_for_path(to_path)[0];
+    //     if from_shard_index == to_shard_index {
+    //         return;
+    //     }
+    //     let db_path = self.shard_path.get_path_for_shard_index(to_shard_index);
+    //     let db = Arc::new(Mutex::new(Database::new(&db_path)));
+    //     self.inner = db;
+    // }
 }
 
 // Todo!(); // compatcion
@@ -140,197 +111,230 @@ impl ArcDatabase {
 // 도움 될 수 있음. 즉 쿼리 중에 읽어야 하는 파일 수를 줄이기 위해 더 작은 SSTable을 더 큰 SSTable로 병합하여
 // 디스크 검색을 줄이고 캐시 지역성을 개선한다.
 
-
-pub struct AccountDB {
-    db: DB,
-    read_opts: ReadOptions,
-    write_opts: WriteOptions,
-}
-
-impl AccountDB {
-    pub fn new(path: &str) -> Self {
-        let db_opts = Options::default();
-        let db = DB::open(&db_opts, path).unwrap();
-        let read_opts = ReadOptions::default();
-
-        let write_opts = WriteOptions::default();
-        Self {
-            db,
-            read_opts,
-            write_opts
-        }
-    }
-
-    pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.db.get_opt(key, &self.read_opts).unwrap()
-    }
-
-    pub fn put(&mut self, key: &[u8], value: &[u8]) {
-        let mut batch = WriteBatch::default();
-        batch.put(key, value);
-        self.db.write_opt(batch,&self.write_opts).unwrap();
-    }
-}
-
-
-pub struct SysDB {
-    db: DB,
-    read_opts: ReadOptions,
-    write_opts: WriteOptions,
-}
-
-impl SysDB {
-    pub fn new(path: &str) -> Self {
-        let db_opts = Options::default();
-        let db = DB::open(&db_opts, path).unwrap();
-        let read_opts = ReadOptions::default();
-
-        let write_opts = WriteOptions::default();
-        Self {
-            db,
-            read_opts,
-            write_opts
-        }
-    }
-
-    pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.db.get_opt(key, &self.read_opts).unwrap()
-    }
-
-    pub fn put(&mut self, key: &[u8], value: &[u8]) {
-        let mut batch = WriteBatch::default();
-        batch.put(key, value);
-        self.db.write_opt(batch,&self.write_opts).unwrap();
-    }
-}
-
-pub struct TokenDB {
-    db: DB,
-    read_opts: ReadOptions,
-    write_opts: WriteOptions,
-}
-
-impl TokenDB {
-    pub fn new(path: &str) -> Self {
-        let db_opts = Options::default();
-        let db = DB::open(&db_opts, path).unwrap();
-        let read_opts = ReadOptions::default();
-
-        let write_opts = WriteOptions::default();
-        Self {
-            db,
-            read_opts,
-            write_opts
-        }
-    }
-
-    pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.db.get_opt(key, &self.read_opts).unwrap()
-    }
-
-    pub fn put(&mut self, key: &[u8], value: &[u8]) {
-        let mut batch = WriteBatch::default();
-        batch.put(key, value);
-        self.db.write_opt(batch,&self.write_opts).unwrap();
-    }
-}
-
-pub fn merge_db(input_dbs: &[&str], shard_size: usize, shard_paths: &[&str]) {
-    let mut shard_dbs = Vec::new();
-    let mut shard_opts = Options::default();
-    shard_opts.create_if_missing(true);
-
-    let mut last_shard_index = 0;
-    let mut last_shard_capacity = 0;
-    let mut shard_count = 0;
-
-    // Try to open all existing shards
-    for shard_path in shard_paths {
-        while let Ok(db) = DB::open(&shard_opts, format!("{}_shard_{}", shard_path, shard_count)) {
-            shard_dbs.push(db);
-            last_shard_index = shard_count;
-            shard_count += 1;
-        }
-    }
-
-    // If no shards exist, create the first one
-    if shard_dbs.is_empty() {
-        let db = DB::open(&shard_opts, format!("{}_shard_{}", shard_path, shard_count)).unwrap();
-        shard_dbs.push(db);
-    } else {
-        // Get the last shard's capacity to initialize last_shard_capacity
-        let last_shard = shard_dbs.last().unwrap();
-        last_shard_capacity = last_shard.get_property_int_value("rocksdb.cur-size-all-mem-tables").unwrap() as usize;
-    }
-
-    // Merge all input databases into shard databases
-    let mut shards_per_path = vec![shard_count / shard_paths.len(); shard_paths.len()];
-    let mut current_path_index = 0;
-    for input_db_path in input_dbs {
-        let input_opts = Options::default();
-        let input_db = DB::open(&input_opts, input_db_path).unwrap();
-        let mut iter = input_db.iterator(IteratorMode::Start);
-
-        while let Some(Ok((key, value))) = iter.next() {
-            let shard_path = shard_paths[current_path_index];
-
-            // let shard_index = calculate_shard_index(&key.to_vec().to_vec()[..], shard_dbs.len(), shard_size, last_shard_index, last_shard_capacity);
-            // let mut shard_db = shard_dbs.get_mut(shard_index).unwrap();
-            let shard_index = calculate_shard_index(&key.to_vec().to_vec()[..], shards_per_path[current_path_index], shard_size, last_shard_index, last_shard_capacity);
-            let mut shard_db = shard_dbs.get_mut(shard_index).unwrap();
-
-
-            let mut batch = WriteBatch::default();
-            batch.put(&key.to_vec()[..], &value.to_vec()[..]);
-
-            let write_opts = WriteOptions::default();
-            shard_db.write_opt(batch, &write_opts).unwrap();
-
-            // Update last shard index and capacity
-            last_shard_index = shard_index;
-            last_shard_capacity += value.len();
-
-            // If last shard is full, create a new one
-            if last_shard_capacity >= shard_size {
-                last_shard_capacity = 0;
-                shard_count += 1;
-                if shard_count % SHARDS_PER_PATH == 0 {
-                    current_path_index = (current_path_index + 1) % shard_paths.len();
-                    shards_per_path[current_path_index] += 1;
-                }
-                let db = DB::open(&shard_opts, format!("{}_shard_{}", shard_path, shard_count)).unwrap();
-                shard_dbs.push(db);
-            }
-        }
-    }
-
-    // Compact all shard databases to optimize storage
-    for shard_db in &shard_dbs {
-        shard_db.compact_range(None::<&[u8]>, None::<&[u8]>); // 'None' compacts the entire database by default
-    }
-}
-
-// Helper function to calculate shard index based on column family name
-// 해싱하지 않으면 u256값을 사용해야함.
-fn calculate_shard_index(key: &[u8], num_shards: usize, shard_size: usize, last_shard_idx: usize, last_shard_capacity: usize) -> usize {
-    let mut shard_idx = (farmhash::hash64(key) as usize) % num_shards;
-
-    // Calculate the total capacity of the current shard
-    let mut total_shard_capacity = (shard_idx + 1) * shard_size;
-    if shard_idx == last_shard_idx {
-        total_shard_capacity -= last_shard_capacity;
-    }
-
-    // If the current shard is full, find the next available shard
-    while total_shard_capacity < key.len() {
-        shard_idx = (shard_idx + 1) % num_shards;
-        total_shard_capacity = (shard_idx + 1) * shard_size;
-        if shard_idx == last_shard_idx {
-            total_shard_capacity -= last_shard_capacity;
-        }
-    }
-    shard_idx
-}
+// pub struct AccountDB {
+//     db: DB,
+//     read_opts: ReadOptions,
+//     write_opts: WriteOptions,
+// }
+//
+// impl AccountDB {
+//     pub fn new(path: &str) -> Self {
+//         let db_opts = Options::default();
+//         let db = DB::open(&db_opts, path).unwrap();
+//         let read_opts = ReadOptions::default();
+//
+//         let write_opts = WriteOptions::default();
+//         Self {
+//             db,
+//             read_opts,
+//             write_opts
+//         }
+//     }
+//
+//     pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+//         self.db.get_opt(key, &self.read_opts).unwrap()
+//     }
+//
+//     pub fn put(&mut self, key: &[u8], value: &[u8]) {
+//         let mut batch = WriteBatch::default();
+//         batch.put(key, value);
+//         self.db.write_opt(batch,&self.write_opts).unwrap();
+//     }
+// }
+//
+//
+// pub struct SysDB {
+//     db: DB,
+//     read_opts: ReadOptions,
+//     write_opts: WriteOptions,
+// }
+//
+// impl SysDB {
+//     pub fn new(path: &str) -> Self {
+//         let db_opts = Options::default();
+//         let db = DB::open(&db_opts, path).unwrap();
+//         let read_opts = ReadOptions::default();
+//
+//         let write_opts = WriteOptions::default();
+//         Self {
+//             db,
+//             read_opts,
+//             write_opts
+//         }
+//     }
+//
+//     pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+//         self.db.get_opt(key, &self.read_opts).unwrap()
+//     }
+//
+//     pub fn put(&mut self, key: &[u8], value: &[u8]) {
+//         let mut batch = WriteBatch::default();
+//         batch.put(key, value);
+//         self.db.write_opt(batch,&self.write_opts).unwrap();
+//     }
+// }
+//
+// pub struct TokenDB {
+//     db: DB,
+//     read_opts: ReadOptions,
+//     write_opts: WriteOptions,
+// }
+//
+// impl TokenDB {
+//     pub fn new(path: &str) -> Self {
+//         let db_opts = Options::default();
+//         let db = DB::open(&db_opts, path).unwrap();
+//         let read_opts = ReadOptions::default();
+//
+//         let write_opts = WriteOptions::default();
+//         Self {
+//             db,
+//             read_opts,
+//             write_opts
+//         }
+//     }
+//
+//     pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+//         self.db.get_opt(key, &self.read_opts).unwrap()
+//     }
+//
+//     pub fn put(&mut self, key: &[u8], value: &[u8]) {
+//         let mut batch = WriteBatch::default();
+//         batch.put(key, value);
+//         self.db.write_opt(batch,&self.write_opts).unwrap();
+//     }
+// }
+//
+// pub fn merge_db(input_dbs: &[&str], shard_size: usize, shard_paths: &[&str]) {
+//     let mut shard_dbs = Vec::new();
+//     let mut shard_opts = Options::default();
+//     shard_opts.create_if_missing(true);
+//
+//     let mut last_shard_index = 0;
+//     let mut last_shard_capacity = 0;
+//     let mut shard_count = 0;
+//
+//     // A total of 128 shards of 26 megabytes each will be allocated for a total capacity of 10 gigabytes.
+//     // Considering emergency redundancy (2 additional shards),
+//     // method 1 (filling all available shards in the path and then moving on to the next path)
+//     // with half load will be used initially, It will fill the paths sequentially until it has allocated a total of 64 (128 halves) shards.
+//     let max_shard_cap = 25_000_000; // Maximum capacity per shard. (margin = 1mb)
+//     let mut last_shard_name = String::new();
+//
+//     // find insufficient shard
+//     for shard_path in shard_paths {
+//         // After getting the list of folders in "shard_path" with the OS command,
+//         // set the last index file name as last_shard_name
+//         // Get list of folders in shard_path
+//         if let Ok(entries) = fs::read_dir(shard_path) {
+//             let mut shard_indices: Vec<usize> = entries
+//                 .filter_map(|e| e.ok())
+//                 .filter_map(|e| {
+//                     let file_name = e.file_name().into_string().ok()?;
+//                     let mut suffixs = file_name.rsplitn(2, "_shard_");
+//                     let suffix = suffixs.next()?;
+//                     let prefix = suffixs.next()?;
+//                     let index = suffix.parse::<usize>().ok()?;
+//                     Some(index)
+//                 })
+//                 .collect();
+//             shard_indices.sort();
+//             shard_indices.dedup();
+//             shard_count += shard_indices.len();
+//
+//             if let Some(last_index) = shard_indices.last() {
+//                 let last_shard_opts = Options::default();
+//                 let tmp_shard_name = format!("{}_shard_{}", shard_path, last_index);
+//                 let mut last_shard = DB::open(&last_shard_opts, &tmp_shard_name).unwrap();
+//                 let mut tmp_capacity = 0;
+//                 let mut last = last_shard.iterator(IteratorMode::Start);
+//                 while let Some(Ok((key, value))) = last.next() {
+//                     tmp_capacity += value.len();
+//                 }
+//                 if tmp_capacity < max_shard_cap {
+//                     last_shard_capacity = tmp_capacity;
+//                     last_shard_name = tmp_shard_name;
+//                 }
+//             }
+//         }
+//     }
+//
+//     // If no shards exist or no insufficient shard exist, create the first one
+//     if last_shard_name.is_empty() {
+//         last_shard_name = format!("{}_shard_{}", shard_path, shard_count);
+//         shard_count += 1;
+//     }
+//
+//     let db = DB::open(&shard_opts, last_shard_name).unwrap();
+//     shard_dbs.push(db);
+//
+//
+//     // Merge all input databases into shard databases
+//     let mut shards_per_path = vec![shard_count / shard_paths.len(); shard_paths.len()];
+//     let mut current_path_index = 0;
+//     for input_db_path in input_dbs {
+//         let input_opts = Options::default();
+//         let input_db = DB::open(&input_opts, input_db_path).unwrap();
+//         let mut iter = input_db.iterator(IteratorMode::Start);
+//
+//         while let Some(Ok((key, value))) = iter.next() {
+//             let shard_path = shard_paths[current_path_index];
+//
+//             let shard_index = calculate_shard_index(&key.to_vec().to_vec()[..], shards_per_path[current_path_index], shard_size, last_shard_index, last_shard_capacity);
+//             let mut shard_db = shard_dbs.get_mut(shard_index).unwrap();
+//
+//
+//             let mut batch = WriteBatch::default();
+//             batch.put(&key.to_vec()[..], &value.to_vec()[..]);
+//
+//             let write_opts = WriteOptions::default();
+//             shard_db.write_opt(batch, &write_opts).unwrap();
+//
+//             // Update last shard index and capacity
+//             last_shard_index = shard_index;
+//             last_shard_capacity += value.len();
+//
+//             // If last shard is full, create a new one
+//             if last_shard_capacity >= shard_size {
+//                 last_shard_capacity = 0;
+//                 shard_count += 1;
+//                 if shard_count % SHARDS_PER_PATH == 0 {
+//                     current_path_index = (current_path_index + 1) % shard_paths.len();
+//                     shards_per_path[current_path_index] += 1;
+//                 }
+//                 let db = DB::open(&shard_opts, format!("{}_shard_{}", shard_path, shard_count)).unwrap();
+//                 shard_dbs.push(db);
+//             }
+//         }
+//     }
+//
+//     // Compact all shard databases to optimize storage
+//     for shard_db in &shard_dbs {
+//         shard_db.compact_range(None::<&[u8]>, None::<&[u8]>); // 'None' compacts the entire database by default
+//     }
+// }
+//
+// // Helper function to calculate shard index based on column family name
+// // 해싱하지 않으면 u256값을 사용해야함.
+// fn calculate_shard_index(key: &[u8], num_shards: usize, shard_size: usize, last_shard_idx: usize, last_shard_capacity: usize) -> usize {
+//     let mut shard_idx = (farmhash::hash64(key) as usize) % num_shards;
+//
+//     // Calculate the total capacity of the current shard
+//     let mut total_shard_capacity = (shard_idx + 1) * shard_size;
+//     if shard_idx == last_shard_idx {
+//         total_shard_capacity -= last_shard_capacity;
+//     }
+//
+//     // If the current shard is full, find the next available shard
+//     while total_shard_capacity < key.len() {
+//         shard_idx = (shard_idx + 1) % num_shards;
+//         total_shard_capacity = (shard_idx + 1) * shard_size;
+//         if shard_idx == last_shard_idx {
+//             total_shard_capacity -= last_shard_capacity;
+//         }
+//     }
+//     shard_idx
+// }
 
 // todo!
 // 1. shard_dbs에 대해 일반 Vec 대신 Arc<Mutex>를 사용하면 여러 스레드가 동일한 벡터에 액세스할 때 스레드
@@ -344,4 +348,4 @@ fn calculate_shard_index(key: &[u8], num_shards: usize, shard_size: usize, last_
 // 예를 들어, 단일 샤드를 생성하여 시작할 수 있으며, 채워지면 데이터를 수용하기 위해 동적으로 새 샤드를 생성.
 // 이렇게 하면 저장 공간을 보다 효율적으로 사용 가능
 //
-// 4. error handling, logging framework 사용용
+// 4. error handling, logging framework 사용
