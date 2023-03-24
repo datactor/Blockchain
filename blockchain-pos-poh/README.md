@@ -418,4 +418,53 @@ indexing에서는 생성된 ConsistentHashRing을 불러와서 수정하는 방�
 Shard는 ConsistentHashRing에서는 node이기 때문에 shard가 추가되는
 rebuild_path() 단계에서만 노드 추가.
 
+#### 3월 24일
 
+##### Arc<Mutex<Shard>> new()
+실제 솔라나에서 database를 ArcMutex로 접근하는 것은 validator이지만,
+validator는 data에 접근할 수 있지만 접근할 위치는 모른다.
+즉 ShardPath나 database의 객체를 가지고 있는 주체는 validator가 아니다.
+validator는 그저 네트워크의 공용 db에 접근 권한만 갖고 있다.
+
+때문에 validator는 해당 ID가 저장된 database(shard)의 위치를 알아내기 위해
+솔라나 네트워크에 요청을 보내야한다. 솔라나의 ShardPath 객체는 공용 네트워크가 아니라
+솔라나 네트워크의 중앙 시스템에 저장되어 있기 때문이다. 이유는 순식간 변할 수 있는 인덱스를
+노드의 업데이트마다 동시에 반영하여 배포하기 어렵기 때문이다.
+
+솔라나에서 ShardPath는 sys program에서 관리한다. sys program은
+계정 생성, 스토리지 할당 및 트랜잭션 처리와 같은 블록체인의 low-level 작업을 관리한다.
+ShardPath는 stroage할당 및 액세스를 관리하는 sys 프로그램의 책임 중 일부이다.
+
+##### Arc<Mutex<Shard>> get()
+우리가 솔라나 cli를 키고 로그인을 한다고 가정해보자.
+그렇다면 우리는 validator와 같은 노드가 아니라, client이며 네트워크 생태계에는 관여하지 않는 일시적인 노드이다.
+즉 클라이언트 노드는 합의 프로세스에 관여하지 않으며 블록 생산 또는 검증에 참여하지 않는다. 대신
+네트워크와 상호작용하여 트랜잭션 제출, 네트워크 상태 쿼리, 자신의 계정 관리와 같은 특정 작업을 수행할 수 있다.
+클라이언트 노드는 validator에 의존하여 네트워크의 무결성과 보안을 유지한다.
+
+로그인 프로세스
+1. 우리는 초기에 로그인을 할때, 저장된 키페어를 입력하고 로그인을 한다.
+   이때 우리는 키페어에서 입력된 accountID를 가지고 get_shard_index메소드로 솔라나 네트워크에 쿼리를 날린다.
+
+2. 솔라나 중앙 집중 네트워크는 쿼리를 받고 Consistent Hash ring 내부에서 accountID에 상응하는 shardIndex와 shardpath를 포함하는
+   Shard 객체를 반환한다.
+
+3. 반환된 Shard 객체는 우리의 클라이언트로 바로 전달되는 것이 아니라, 해당 샤드를 담당하는 validator에서
+   Shard database에서 계정 데이터에 엑세스한다. 그 후에 특정 accountID를 찾아서 accountID와 pubkey가 일치하는지 검증한 후,
+   특정 AccountID만 네트워크로 전송하고 네트워크에서 client로 전송해준다. 이것은 ShardPath 관리는 중앙 집중화하고,
+   validator가 실행되기 전에 요청의 유효성을 확인할 수 있도록 하여 네트워크의 무결성과 보안을 보장하는 데 도움이 된다.
+   또한 클라이언트에서 database에 직접 접근할 수단이 없게하여 데이터의 무결성을 보장하는데 도움을 준다.
+- 여기서 validator가 shard에 접근할때, 로그인같은 데이터 변동성이 없는 작업이더라도 Arc<Mutex<Database>>에 readOption으로 접근한다.
+  이론상 lock이 필요하지 않을 수 있지만 솔라나의 설계 철학은 읽기전용 작업을 포함한 모든 작업에서 스레드 안전성과 일관성을 우선시한다.
+  즉 read에도 일관적으로 정확한 reading 철학을 고수한다.
+
+- 여기서 발생하는 또다른 문제. shard의 평균 크기는 32gb로 매우 크다. 이렇게 큰 db를 검색할때마다 매번 lock을 거는 것은 매우 비효율적으로 보인다.
+  때문에 솔라나는 여기서 Shard를 "accounts"라는 chunk로 나눈다. db를 shard로 나누듯이 역시나 여기서도 jump consistent hashing을
+  사용해서 나눈다. 역시나 ShardPath struct 처럼 AccountPath struct가 따로 있고 sys program에서 담당한다.
+  
+4. AccountPath까지 고려한 validator의 접근방식
+   validator는 먼저 ShardPath로 계정이 있는 shard를 찾는다. 그런 다음 ShardIndex를 사용하여
+   속한 chunk를 계산(jumpConsistent Hashing으로 계산)하고 마지막으로 필요한 작업을 수행하기 위해 해당 청크만 잠근다.
+   Accounts가 생성되는 시기는, shard가 생성됨과 동시에 그 shard를 새로운 account chunk들로 나눈다.
+   즉, 솔라나 네트워크에 ShardPath 객체는 하나지만, AccountPath 객체는 각 샤드에 대해서 인덱싱 해야하기 때문에 샤드의 개수만큼 있다.
+   그러므로 validator는 전체 샤드가 아닌 Accounts만 잠갔기 때문에 샤드의 나머지 부분에는 다른 노드들이 접근할 수 있다.
