@@ -468,3 +468,26 @@ ShardPath는 stroage할당 및 액세스를 관리하는 sys 프로그램의 책
    Accounts가 생성되는 시기는, shard가 생성됨과 동시에 그 shard를 새로운 account chunk들로 나눈다.
    즉, 솔라나 네트워크에 ShardPath 객체는 하나지만, AccountPath 객체는 각 샤드에 대해서 인덱싱 해야하기 때문에 샤드의 개수만큼 있다.
    그러므로 validator는 전체 샤드가 아닌 Accounts만 잠갔기 때문에 샤드의 나머지 부분에는 다른 노드들이 접근할 수 있다.
+
+##### validator 정의
+validator로 참여하기 위해서는 일정량의 SOL을 스테이킹하고 네트워크에 참여하기에 충분한 컴퓨팅 자원을 갖춘
+validator node를 운영해야 한다. validator는 CPU, 메모리 및 스토리지 용량과 같이 네트워크에 참여하는 데
+필요한 컴퓨팅 리소스를 제공할 책임이 있다.
+
+1. validator는 솔라나 네트워크에 연결되고 합의 과정에 참여하는 솔라나 노드를 실행한다.
+2. 솔라나 노드는 비동기로 쓰레드를 열고 AccountsPath, transaction from sender to recipient 요청을 기다린다.
+3. 요청이 오면 단순 요청(login, balancing)인지, tx 요청인지 확인한다. AccountID받는다.
+4. 어떤 경우이든 일단 솔라나 네트워크에 AccountID를 보내고 ShardPath or AccountPath를 요청하여 반환받는다.
+5. 반환 받은 ShardPath로 Shard를 검색하여 들어가서 Arc<mutex>로 lock을 건다.
+6. accountID와 pubkey가 일치하는지 확인한다.
+7. 1) accountID와 pubkey가 일치할때 여기서 단순 요청(login, balancing)이면 네트워크(sys program이 받는다)에 accountID만 보낸다.
+      실패하면 실패 메시지를 보냄
+   2) accountID와 pubkey가 일치할때 여기서 tx 요청이라면 PoH, 서명확인, 간단한 PoW로 검증한다. 검증이 성공하면 validator가 서명하고
+      accountID뿐만 아니라 블록 정보를 네트워크로 보낸다. 실패하면 실패 메시지를 보냄.
+8. 블록 업데이트는 stake를 비롯한 tx가 있을 경우에만 수행하기 때문에, 업데이트가 완료되면 네트워크의 다른 노드에 블록정보를 propagates한다.
+   이것은 노드가 네트워크의 다른 노드와 생성하거나 수신한 블록에 대한 정보를 공유하는 gossip으로 알려진 프로세스를 통해 발생한다.
+   블록이 충분한 validator에게 전파되고 충분한 확인을 받으면 블록체인이 완성된것으로 간주되어 블록체인에 추가된다.
+   validator는 네트워크의 다른 노드에 블록을 propagating할 책임이 있지만 네트워크 전체는 합의 프로세스를 조정하고
+   모든 노드가 궁극적으로 블록체인 state에 동의하는지 확인하는 역할을 한다.
+9. 블록 생성 및 유효성 검사에 대해 SOL 토큰으로 보상을 받는다.
+10. 검증자로서 프로토콜 업그레이드 또는 네트워크 매개변수 변경 제안에 대한 투표와 같은 네트워크 거버넌스 결정에 참여할 수도 있다.
