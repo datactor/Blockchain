@@ -1,0 +1,5 @@
+{
+  "shard_prefix": "shard_",
+  "num_shards_per_path": 32,
+  "shard_size": 25000000
+}

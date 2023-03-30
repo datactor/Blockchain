@@ -1,6 +1,4 @@
 use chrono::prelude::*;
-// use ed25519_dalek::ed25519::Error;
-// use ed25519_dalek::Verifier;
 use ring::signature::{Ed25519KeyPair, UnparsedPublicKey, ED25519};
 
 pub mod block;
@@ -15,6 +13,9 @@ pub mod configmap;
 pub mod repl;
 pub mod token;
 pub mod database;
+// pub mod nodes;
+pub mod shardpath;
+// pub mod shardable;
 
 pub use crate::{
     block::Block,
@@ -28,6 +29,9 @@ pub use crate::{
     sys::sys::*,
     repl::login_menu_main,
     transaction::Message,
+    database::{Database, DBPool},
+    shardpath::ShardPath,
+    // shardable::ShardDB,
 };
 
 type Signature = [u8; 64];

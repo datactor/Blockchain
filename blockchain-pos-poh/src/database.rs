@@ -2,12 +2,16 @@ use std::{
     collections::HashMap,
     fs,
     sync::{Arc, Mutex},
+    time::{Duration, Instant},
 };
+
 use crate::{Account, Hash, Pubkey};
 use bs58::{encode, decode};
 use rocksdb::{
     DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions, IteratorMode, DBWithThreadMode, SingleThreaded,
 };
+
+use crate::ShardPath;
 
 const NUM_SHARDS: usize = 128;
 const SHARDS_PER_PATH: usize = 32;
@@ -19,9 +23,9 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn new(path: &str) -> Self {
+    pub fn new(shard_path: &str) -> Self {
         let db_opts = Options::default();
-        let db = DB::open(&db_opts, path).unwrap();
+        let db = DB::open(&db_opts, shard_path).unwrap();
         let read_opts = ReadOptions::default();
         // 기본적으로 readOptions를 사용하지 않아도 RocksDB에서 데이터를 읽을 때, 데이터가 메모리에 캐시되어 후속 읽기 성능이 향상된다.
         // 그러나 이렇게 하면 데이터를 읽거나 자주 변경되는 데이터를 읽는 경우 memory bloat이 일어날 수 있다.
@@ -50,33 +54,90 @@ impl Database {
     }
 }
 
-pub struct ArcDatabase {
-    inner: Arc<Mutex<Database>>,
+// validator는 캐시하는 것 처럼 DB들을 집합으로 DBPool로 만들어서 저장하고 있다.
+pub struct DBPool {
+    pool: Arc<HashMap<String, Arc<Mutex<Database>>>>,
+    last_accessed: HashMap<String, Instant>,
 }
 
-impl ArcDatabase {
-    pub fn new(path: &str) -> Self {
+// get shard index 메소드는 필요없다 validator에게 요청이 가기 전에 네트워크에서 먼저 sys 프로그램에 해당 요청의
+// 메시지를 보낸 후에 해당 accountID로 consiste hash ring을 검색해서 ShardPath를 색인해서 꺼내온 다음에
+// PoS에 의해 선택된 validator에게 accountID와 ShardPath, ShardIndex를 보낼 것이기 때문
+// 그렇게 하면 validator는 해당 ShardPath의 chunk에 lock을 걸고 accountID를 검색해서 수정하거나 정보를 가져온 다음에
+// DBPool에 넣고 lock을 해제할 것
+impl DBPool {
+    pub fn new() -> Self {
         Self {
-            inner: Arc::new(Mutex::new(Database::new(path))),
+            pool: Arc::new(HashMap::new()),
+            last_accessed: HashMap::new(),
         }
     }
 
-    fn get_shard_index(&self, key: &[u8]) -> usize {
-        (key[0] as usize) % NUM_SHARDS
+    pub fn get_information(&mut self, account_id: &[u8], shard_path: String) {
+        let now = Instant::now();
+        // if self contains the database
+        if let Some(database) = self.pool.get(&shard_path) {
+            let db = database.lock().unwrap();
+            db.get(account_id);
+            self.last_accessed.insert(shard_path, now);
+            return
+        }
+        // if self does not contains the database
+        let database = Arc::new(Mutex::new(Database::new(&shard_path)));
+        let mut databases = Arc::make_mut(&mut self.pool);
+        {
+            let db = database.lock().unwrap();
+            db.get(account_id);
+        }
+        databases.insert(shard_path.clone(), database);
+        self.last_accessed.insert(shard_path, now);
     }
 
-    pub fn get(&self, account_id: &[u8]) -> Option<Vec<u8>> {
-        let shard_index = self.get_shard_index(account_id);
-        let db = self.inner.lock().unwrap();
-        db.get(account_id)
-    }
+    // pub fn put_account(&self, account_id: &[u8], value: &[u8]) {
+    //     let shard_index = self.get_shard_index(account_id);
+    //     let mut database = self.pool[shard_index].lock().unwrap();
+    //     database.put(account_id, value);
+    // }
 
-    pub fn put(&self, account_id: &[u8], value: &[u8]) {
-        let shard_index = self.get_shard_index(account_id);
-        let mut db = self.inner.lock().unwrap();
-        db.put(account_id, value);
+    pub fn remove_inactive_database(&mut self) {
+        let mut databases = Arc::make_mut(&mut self.pool);
+        let now = Instant::now();
+        self.last_accessed.retain(|k, v| {
+            let elapsed_time = v.elapsed().as_secs();
+            if elapsed_time >= 14400 {
+                databases.remove(k);
+                false
+            } else {
+                true
+            }
+        });
     }
-
+}
+// pub struct DBPool {
+//     inner: Arc<Mutex<Database>>,
+// }
+//
+// impl DBPool {
+//     pub fn new(path: &str) -> Self {
+//         Self {
+//             inner: Arc::new(Mutex::new(Database::new(path))),
+//         }
+//     }
+//
+//     fn get_shard_index(&self, key: &[u8]) {}
+//
+//     pub fn get(&self, account_id: &[u8]) -> Option<Vec<u8>> {
+//         let shard_index = self.get_shard_index(account_id);
+//         let db = self.inner.lock().unwrap();
+//         db.get(account_id)
+//     }
+//
+//     pub fn put(&self, account_id: &[u8], value: &[u8]) {
+//         let shard_index = self.get_shard_index(account_id);
+//         let mut db = self.inner.lock().unwrap();
+//         db.put(account_id, value);
+//     }
+// }
     // pub fn remove_path(&mut self, path: &str) {
     //     self.shard_path.remove_path(path);
     //     let shard_indexes = self.shard_path.get_shard_indexes_for_path(path);
@@ -101,7 +162,7 @@ impl ArcDatabase {
     //     let db = Arc::new(Mutex::new(Database::new(&db_path)));
     //     self.inner = db;
     // }
-}
+
 
 // Todo!(); // compatcion
 // 데이터 베이스를 더 효율적인 구조를 갖게 여러 개의 작은 파일을 병합하거나 중복 데이터를 삭제함. 이것은 atomic하게 처리됨.

@@ -491,3 +491,17 @@ validator node를 운영해야 한다. validator는 CPU, 메모리 및 스토리
    모든 노드가 궁극적으로 블록체인 state에 동의하는지 확인하는 역할을 한다.
 9. 블록 생성 및 유효성 검사에 대해 SOL 토큰으로 보상을 받는다.
 10. 검증자로서 프로토콜 업그레이드 또는 네트워크 매개변수 변경 제안에 대한 투표와 같은 네트워크 거버넌스 결정에 참여할 수도 있다.
+
+#### 3월 30일
+
+##### ShardPath 및 database 컴파일
+
+##### for loop에서 lazy하게 move하는 기술
+for (account_id, path) in std::mem::take(&mut self.inner) {}
+이렇게 하면 복제나 할당없이 self.inner의 원소를 하나씩 take하여 가져올 수 있다.
+
+##### 추후에 ShardPath::get_shard() 메소드의 정해진 시간마다 rebalancing 메소드 수정하기
+Consistent Hash ring의 구조에서 현재의 샤드와 path의 결정론적을 유지하면서 re-indexing하는 것은 의미가 없으며 불필요한 리소스 낭비다.
+그러니 추후에 정해진 시간이 되면 load가 큰 path의 shard와 load가 적은 path의 shard를 교환하는 로직을 짜보자.
+
+##### DBPool 생성 및 코드 수정

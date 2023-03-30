@@ -11,6 +11,7 @@ use ring::digest;
 
 use rocksdb::{DB, Options, WriteBatch, WriteOptions, IteratorMode};
 use serde::Deserialize;
+use serde_json::Deserializer;
 
 const MAX_NUM_SHARDS: usize = 128;
 const SHARD_SIZE: usize = 25_000_000;
@@ -25,6 +26,7 @@ struct ShardConfig {
     shard_size: u32,
 }
 
+#[derive(Clone)]
 pub struct ShardPath {
     inner: HashMap<(u16, u16), String>,
     last_reindexed: Instant,
@@ -61,12 +63,15 @@ impl ShardPath {
             }
 
             // Map each account ID to a shard using the hash ring
-            self.inner.clear();
-            for account_id in self.accounts.keys() {
-                let shard_path = ring.get_node(account_id);
-                self.inner.insert((account_id[0] as u16, account_id[1] as u16), shard_path.to_string());
+            let mut new_inner = HashMap::new();
+            // for문을 lazy하게 move하는 기술. std::mem::take(&mut self.inner)을 통해 복제나 할당없이, 원소 하나씩 take하여 이동시킴
+            for (account_id, path) in std::mem::take(&mut self.inner) {
+                if let Some(shard_path) = ring.get_node(&path) {
+                    new_inner.insert(account_id, shard_path);
+                }
             }
 
+            self.inner = new_inner;
             self.ring = ring;
             self.last_reindexed = Instant::now();
         }
@@ -76,20 +81,25 @@ impl ShardPath {
         let (high_level_shard_index, low_level_shard_index) = (account_id[0] as u16, account_id[1] as u16);
 
         // 샤드를 이미 할당하여 인덱싱 해뒀으면 shard 리턴
-        if let Some(shard) = self.inner.get(&(high_level_shard_index, low_level_shard_index)) {
+        if let Some(shard) = self.inner.get(&(high_level_shard_index, low_level_shard_index)).map(|s| s.to_owned()) {
             // Reindex periodically if necessary
+            // Consistent Hash ring의 구조에서 현재의 샤드와 path의 결정론적을 유지하면서 re-indexing하는 것은 의미가 없다.
+            // 그러니 추후에 정해진 시간이 되면 load가 큰 path의 shard와 load가 적은 path의 shard를 교환하는 로직을 짜보자.
             if self.last_reindexed.elapsed() > Duration::from_secs(REINDEX_INTERVAL) {
-                self.rebuild_path(None)
-            };
-            return Some(shard.to_owned())
+                self.rebuild_path(None);
+            }
+            return Some(shard)
         }
 
+        // Check if shard is already assigned
         None
     }
 
+    // 기존의 path에 새로운 path를 추가했을 때 사용.
     pub fn rebuild_path(&mut self, paths: Option<Vec<String>>) -> Self {
         let val = self.inner.values();
-        let mut prev_paths = val.into_iter().map(|(i, mut path)| path.split("/shards/").next().unwrap().to_string())
+        let mut prev_paths = val.into_iter()
+            .map(|mut path| path.split("/shards/").next().unwrap().to_string())
             .collect::<HashSet<_>>();
 
         // If None is received, only indexing is performed.
@@ -107,85 +117,6 @@ impl ShardPath {
         new_shardpath.index_shards(Some(&all_paths[..]));
 
         new_shardpath
-    }
-
-    pub fn move_shard(&mut self) {
-        unimplemented!();
-        let mut max_load_path: Option<String> = None;
-        let mut min_load_path: Option<String> = None;
-        let mut max_load: u32 = 0;
-        let mut min_load: u32 = u32::MAX;
-
-        // Find the path with the highest load and the path with the lowest load
-        for (path, load) in self.get_load_by_path() {
-            if load > max_load {
-                max_load_path = Some(path.to_owned());
-                max_load = load;
-            }
-            if load < min_load {
-                min_load_path = Some(path.to_owned());
-                min_load = load;
-            }
-        }
-
-        // Find the shard with the highest load in the path with the highest load
-        let mut max_load_shard: Option<String> = None;
-        let mut max_load_shard_count: u32 = 0;
-        if let Some(path) = max_load_path {
-            for (shard, count) in self.get_shard_counts_by_path(&path) {
-                if count > max_load_shard_count {
-                    max_load_shard = Some(shard.to_owned());
-                    max_load_shard_count = count;
-                }
-            }
-        }
-
-        // Move the shard to the path with the lowest load
-        if let Some(shard) = max_load_shard {
-            let shard_index = shard.rfind('/').unwrap();
-            let shard_root_path = &shard[..shard_index];
-            let new_shard_path = format!("{}/shards/{}", min_load_path.unwrap(), &shard[shard_index + 1..]);
-
-            // Rename the shard directory
-            let _ = fs::rename(&shard, &new_shard_path);
-
-            // Remove the old shard from the index
-            let _ = self.remove_shard_from_index(&shard_root_path, &shard);
-
-            // Add the new shard to the index
-            self.add_shard_to_index(&min_load_path.unwrap(), &new_shard_path);
-        }
-    }
-
-    fn get_load_by_path(&self) -> HashMap<&str, u32> {
-        unimplemented!();
-        let mut load_by_path: HashMap<&str, u32> = HashMap::new();
-        for shard_path in self.inner.values() {
-            let path = shard_path.split('/').next().unwrap();
-            *load_by_path.entry(path).or_insert(0) += 1;
-        }
-        load_by_path
-    }
-
-    fn get_shard_counts_by_path(&self, path: &str) -> HashMap<&str, u32> {
-        unimplemented!();
-        let mut shard_counts_by_path: HashMap<&str, u32> = HashMap::new();
-        for shard_path in self.inner.values() {
-            if shard_path.starts_with(path) {
-                let shard = shard_path.rsplitn(2, '/').next().unwrap();
-                *shard_counts_by_path.entry(shard).or_insert(0) += 1;
-            }
-        }
-        shard_counts_by_path
-    }
-
-    fn remove_shard_from_index(&mut self, root_path: &str, shard_path: &str) -> Option<String> {
-        unimplemented!();
-        let key = self.inner.iter().find(|(_, v)| **v == shard_path)?.0;
-        let old_shard = self.inner.remove(key)?;
-        let new_shard = old_shard.replace(root_path, "");
-        self.inner.insert(key.to_owned(), new_shard);
-        Some(old_shard)
     }
 }
 
@@ -252,3 +183,84 @@ impl ConsistentHashRing {
         hasher.finish()
     }
 }
+
+// fn tmp() {
+//     pub fn move_shard(&mut self) {
+//         unimplemented!();
+//         // let mut max_load_path: Option<String> = None;
+//         // let mut min_load_path: Option<String> = None;
+//         // let mut max_load: u32 = 0;
+//         // let mut min_load: u32 = u32::MAX;
+//         //
+//         // // Find the path with the highest load and the path with the lowest load
+//         // for (path, load) in self.get_load_by_path() {
+//         //     if load > max_load {
+//         //         max_load_path = Some(path.to_owned());
+//         //         max_load = load;
+//         //     }
+//         //     if load < min_load {
+//         //         min_load_path = Some(path.to_owned());
+//         //         min_load = load;
+//         //     }
+//         // }
+//         //
+//         // // Find the shard with the highest load in the path with the highest load
+//         // let mut max_load_shard: Option<String> = None;
+//         // let mut max_load_shard_count: u32 = 0;
+//         // if let Some(path) = max_load_path {
+//         //     for (shard, count) in self.get_shard_counts_by_path(&path) {
+//         //         if count > max_load_shard_count {
+//         //             max_load_shard = Some(shard.to_owned());
+//         //             max_load_shard_count = count;
+//         //         }
+//         //     }
+//         // }
+//         //
+//         // // Move the shard to the path with the lowest load
+//         // if let Some(shard) = max_load_shard {
+//         //     let shard_index = shard.rfind('/').unwrap();
+//         //     let shard_root_path = &shard[..shard_index];
+//         //     let new_shard_path = format!("{}/shards/{}", min_load_path.unwrap(), &shard[shard_index + 1..]);
+//         //
+//         //     // Rename the shard directory
+//         //     let _ = fs::rename(&shard, &new_shard_path);
+//         //
+//         //     // Remove the old shard from the index
+//         //     let _ = self.remove_shard_from_index(&shard_root_path, &shard);
+//         //
+//         //     // Add the new shard to the index
+//         //     self.add_shard_to_index(&min_load_path.unwrap(), &new_shard_path);
+//         // }
+//     }
+//
+//     fn get_load_by_path(&self) -> HashMap<&str, u32> {
+//         unimplemented!();
+//         // let mut load_by_path: HashMap<&str, u32> = HashMap::new();
+//         // for shard_path in self.inner.values() {
+//         //     let path = shard_path.split('/').next().unwrap();
+//         //     *load_by_path.entry(path).or_insert(0) += 1;
+//         // }
+//         // load_by_path
+//     }
+//
+//     fn get_shard_counts_by_path(&self, path: &str) -> HashMap<&str, u32> {
+//         unimplemented!();
+//         // let mut shard_counts_by_path: HashMap<&str, u32> = HashMap::new();
+//         // for shard_path in self.inner.values() {
+//         //     if shard_path.starts_with(path) {
+//         //         let shard = shard_path.rsplitn(2, '/').next().unwrap();
+//         //         *shard_counts_by_path.entry(shard).or_insert(0) += 1;
+//         //     }
+//         // }
+//         // shard_counts_by_path
+//     }
+//
+//     fn remove_shard_from_index(&mut self, root_path: &str, shard_path: &str) -> Option<String> {
+//         unimplemented!();
+//         // let key = self.inner.iter().find(|(_, v)| **v == shard_path)?.0;
+//         // let old_shard = self.inner.remove(key)?;
+//         // let new_shard = old_shard.replace(root_path, "");
+//         // self.inner.insert(key.to_owned(), new_shard);
+//         // Some(old_shard)
+//     }
+// }

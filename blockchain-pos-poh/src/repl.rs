@@ -36,8 +36,6 @@ impl std::fmt::Display for Error {
 // impl std::error::Error for Error {}
 
 pub fn login_menu_main(accountset: &mut AccountSet) {
-    let db = DB::open_default("./db/accountDB").unwrap();
-
     let args: Vec<String> = env::args().collect();
     let mut accountset = accountset;
 
@@ -64,6 +62,7 @@ pub fn login_menu_main(accountset: &mut AccountSet) {
                     0 => break, // exit program
                     1 => {
                         println!("log in\n");
+                        let db = DB::open_default("./db/accountDB").unwrap();
                         if let Some(mut account) = result_wrapper(login(accountset, &db)) {
                             // action_menu(&mut account, accountset)
                         }
