@@ -16,6 +16,7 @@ pub mod database;
 // pub mod nodes;
 pub mod shardpath;
 // pub mod shardable;
+pub mod rate_limiter;
 
 pub use crate::{
     block::Block,

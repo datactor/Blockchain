@@ -524,3 +524,16 @@ DB::new에서 DB가 없으면 create_if_missing(true)가 default 설정이기 �
 ##### DB::get 메서드에 unwrap 제거, 실패시 존재하지 않는 아이디 라는 메시지 반환시키기
 
 ##### Error handling database
+
+##### client에 rate-limiter 구현해놓기
+user의 요청 수를 추적하고 해당 요청이 일정 시간 내에 특정 임계값을 초과할 경우,
+일시적으로 차단하거나 제한함으로써 악의적인 행위자가 대량으로 시스템을 압도하는 것을 방지
+
+##### remove_inactive_database 수정
+DBPool은 validator의 capacity가 한정되어 있기때문에, Pool에 db를 언제까지 추가할 수 만은 없다.
+기존의 remove_inactive_database는 4시간동안 접근이 없으면 삭제하는 무차별적 삭제방식이었는데, 
+이보다 더 정교한 기준이 필요할 듯 하다.
+
+1. property_int_value("rocksdb.estimate-live-data-size") 메서드를 통해 live data 양을 추정하여 각 db의 사용패턴 계산.
+2. 사용량 별로 db를 정렬하고 가장 적게 사용된 db를 정리하여 데이터베이스의 절반 이상을 유지.
+3. 나머지 db는 마지막으로 엑세스한 이후 시간을 기준으로 가지치기

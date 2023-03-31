@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    fs,
-    sync::{Arc, Mutex},
-    time::{Duration, Instant}
-};
+use std::{cmp, collections::HashMap, fs, sync::{Arc, Mutex}, time::{Duration, Instant}};
 
 use crate::{Account, Hash, Pubkey};
 use bs58::{encode, decode};
@@ -44,10 +39,8 @@ impl Database {
         // self.db.get_opt(key, &self.read_opts).unwrap()
         match self.db.get_opt(key, &self.read_opts) {
             Ok(Some(val)) => Ok(Some(val)),
-            // Ok(None) => Ok(None),
-            // Err(Some(_)) => Err(format!("Error: The [{:?}] account ID does not exist", key)),
-            // Err(None) => Err(format!("Error: The [{:?}] account ID does not exist", key)),
-            _ => Err(format!("Error: The [{:?}] account ID does not exist", key)),
+            Ok(None) => Err(format!("Error: The [{:?}] account ID does not exist", key)),
+            Err(e) => Err(format!("Error: Failed to read from database: {:?}", e)),
         }
     }
 
@@ -164,9 +157,28 @@ impl DBPool {
 
     pub fn remove_inactive_database(&mut self) {
         let mut databases = Arc::make_mut(&mut self.pool);
+        let mut database_usage = HashMap::new();
+
+        // Calculate usage patterns for each database
+        for (shard_path, database) in databases.iter() {
+            let db = database.lock().unwrap();
+            let stats = db.db.property_int_value("rocksdb.estimate-live-data-size").unwrap_or(Some(0));
+            database_usage.insert(shard_path.clone(), stats.unwrap_or(0));
+        }
+        // Sort databases by usage and prune the least used ones
+        let mut database_keys = database_usage.keys().cloned().collect::<Vec<_>>();
+        database_keys.sort_by_key(|k| database_usage[k]);
+        let num_to_remove = cmp::max(database_keys.len() / 4, 1);
+        for shard_path in database_keys.into_iter().take(num_to_remove) {
+            databases.remove(&shard_path);
+            database_usage.remove(&shard_path);
+            self.last_accessed.remove(&shard_path);
+        }
+
+        // Prune the rest of the databases based on time since last accessed
         self.last_accessed.retain(|k, v| {
             let elapsed_time = v.elapsed().as_secs();
-            if elapsed_time >= 14400 {
+            if elapsed_time >= 14400 && !database_usage.contains_key(k) {
                 databases.remove(k);
                 false
             } else {
