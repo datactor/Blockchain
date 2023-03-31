@@ -49,13 +49,6 @@ impl Database {
         // 'put' operation ensure that each write is fully committed or not committed at all
         let mut batch = WriteBatch::default(); // 개별 쓰기가 아닌 일괄 batch 처리
 
-        // if let Ok(_) = self.get(key) {
-        //     return Err(format!("Error: The [{:?}] account ID already exist", key))
-        // }
-        //
-        // batch.put(key, value);
-        // self.db.write_opt(batch,&self.write_opts).unwrap();
-        // Ok(())
         match self.get(key) {
             Ok(Some(_)) => Err(format!("Error: The [{:?}] account ID already exists", key)),
             _ => {
@@ -82,6 +75,7 @@ impl Database {
 pub struct DBPool {
     pool: Arc<HashMap<String, Arc<Mutex<Database>>>>,
     last_accessed: HashMap<String, Instant>,
+    max_dbs: usize,
 }
 
 // get shard index 메소드는 필요없다 validator에게 요청이 가기 전에 네트워크에서 먼저 sys 프로그램에 해당 요청의
@@ -90,23 +84,34 @@ pub struct DBPool {
 // 그렇게 하면 validator는 해당 ShardPath의 chunk에 lock을 걸고 accountID를 검색해서 수정하거나 정보를 가져온 다음에
 // DBPool에 넣고 lock을 해제할 것
 impl DBPool {
-    pub fn new() -> Self {
+    pub fn new(max_dbs: usize) -> Self {
         Self {
             pool: Arc::new(HashMap::new()),
             last_accessed: HashMap::new(),
+            max_dbs,
         }
     }
 
     pub fn get_information(&mut self, account_id: &[u8], shard_path: String) -> Result<Option<Vec<u8>>, String> {
         let now = Instant::now();
         // if self contains the database
-        let databases = Arc::get_mut(&mut self.pool).unwrap();
+        let mut databases = Arc::get_mut(&mut self.pool).unwrap();
         if let Some(database) = databases.get(&shard_path) {
             let db = database.lock().unwrap();
             let result = db.get(account_id).expect("Account retrieval failure");
             self.last_accessed.insert(shard_path, now);
             return Ok(result)
         }
+
+        // check if the maximum number of open databases has been reached
+        let len = databases.len();
+        if len >= self.max_dbs {
+            self.remove_inactive_database();
+        }
+
+        // removed되어 가벼워진 databases로 변경 후 불러오기
+        databases = Arc::get_mut(&mut self.pool).unwrap();
+
         // if self does not contains the database
         let metadata = fs::metadata(&shard_path); // 경로가 잘못되어도 무분별한 생성을 막기 위한 초석.
         if metadata.is_ok() && metadata.unwrap().is_dir() {
@@ -128,7 +133,7 @@ impl DBPool {
     // sign-in 했을 경우에만 수행하는 함수
     pub fn put_account(&mut self, shard_path: String, key: &[u8], val: &[u8]) -> Result<(), String> {
         let now = Instant::now();
-        let databases = Arc::get_mut(&mut self.pool).unwrap();
+        let mut databases = Arc::get_mut(&mut self.pool).unwrap();
 
         // if self contains the database
         if let Some(database) = databases.get_mut(&shard_path) {
@@ -137,17 +142,26 @@ impl DBPool {
             self.last_accessed.insert(shard_path, now);
             return Ok(())
         }
+
+        // check if the maximum number of open databases has been reached
+        let len = databases.len();
+        if len >= self.max_dbs {
+            self.remove_inactive_database();
+        }
+
+        // removed되어 가벼워진 databases로 변경 후 불러오기
+        databases = Arc::get_mut(&mut self.pool).unwrap();
+
         // if self does not contains the database
         let metadata = fs::metadata(&shard_path); // 경로가 잘못되어도 무분별한 생성을 막기 위한 초석.
         if metadata.is_ok() && metadata.unwrap().is_dir() {
             let database = Arc::new(Mutex::new(Database::new(&shard_path)));
-            let mut databases = Arc::make_mut(&mut self.pool);
             {
                 let mut db = database.lock().unwrap();
                 db.create_account(key, val).expect("account creation failure");
             }
             databases.insert(shard_path.clone(), database);
-            self.last_accessed.insert(shard_path.clone(), now);
+            self.last_accessed.insert(shard_path, now);
             return Ok(())
         }
 
@@ -163,7 +177,7 @@ impl DBPool {
         for (shard_path, database) in databases.iter() {
             let db = database.lock().unwrap();
             let stats = db.db.property_int_value("rocksdb.estimate-live-data-size").unwrap_or(Some(0));
-            database_usage.insert(shard_path.clone(), stats.unwrap_or(0));
+            database_usage.insert(shard_path.to_owned(), stats.unwrap_or(0));
         }
         // Sort databases by usage and prune the least used ones
         let mut database_keys = database_usage.keys().cloned().collect::<Vec<_>>();
