@@ -505,3 +505,22 @@ Consistent Hash ring의 구조에서 현재의 샤드와 path의 결정론적을
 그러니 추후에 정해진 시간이 되면 load가 큰 path의 shard와 load가 적은 path의 shard를 교환하는 로직을 짜보자.
 
 ##### DBPool 생성 및 코드 수정
+
+#### 3월 31일
+
+##### DBPool::put_account
+
+##### DB::put
+
+##### DB::new, DB::put의 잠재적 취약점
+DB::new에서 DB가 없으면 create_if_missing(true)가 default 설정이기 때문에,
+샤드가 검색되지 않으면 자동생성함.
+이것의 이점은 따로 초기화시키지 않아도 검색할때마다 필요에 의해 생성할 수 있지만,
+경로가 잘못될 경우 새롭게 생성되는 문제가 발생할 수 있음.
+
+이것의 해결은 metadata에 대한 조건을 걸어서 해당 디렉토리에 메타데이터 파일이 있으면,
+생성시키고, 없으면 생성시키지 않는다.
+
+##### DB::get 메서드에 unwrap 제거, 실패시 존재하지 않는 아이디 라는 메시지 반환시키기
+
+##### Error handling database

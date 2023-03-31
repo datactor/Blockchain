@@ -111,7 +111,7 @@ and the nonce is the key to that puzzle. The process of finding that key is call
   2. 크지 않을 경우 continue해서 계속 탐색
   
 앞에서도 강조한 것처럼 block header의 hash는 비가역성을 가졌기 때문에
-역으로 찾을 수 없어 O(n)의 brute force 탐색을 해야 한다.
+역으로 찾을 수 없어(복호화 불가) O(n)의 brute force 탐색을 해야 한다.
 
 ### Reveiew: Mining
 A block having been "mined" means that an amount of effort has been put into discovering

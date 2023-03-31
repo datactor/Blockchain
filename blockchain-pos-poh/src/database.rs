@@ -2,14 +2,12 @@ use std::{
     collections::HashMap,
     fs,
     sync::{Arc, Mutex},
-    time::{Duration, Instant},
+    time::{Duration, Instant}
 };
 
 use crate::{Account, Hash, Pubkey};
 use bs58::{encode, decode};
-use rocksdb::{
-    DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions, IteratorMode, DBWithThreadMode, SingleThreaded,
-};
+use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions, IteratorMode, DBWithThreadMode, SingleThreaded, Error};
 
 use crate::ShardPath;
 
@@ -41,16 +39,49 @@ impl Database {
         }
     }
 
-    pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.db.get_opt(key, &self.read_opts).unwrap()
+    // unwrap 제거, 실패시 존재하지 않는 아이디 라는 메시지 반환하기
+    pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, String> {
+        // self.db.get_opt(key, &self.read_opts).unwrap()
+        match self.db.get_opt(key, &self.read_opts) {
+            Ok(Some(val)) => Ok(Some(val)),
+            // Ok(None) => Ok(None),
+            // Err(Some(_)) => Err(format!("Error: The [{:?}] account ID does not exist", key)),
+            // Err(None) => Err(format!("Error: The [{:?}] account ID does not exist", key)),
+            _ => Err(format!("Error: The [{:?}] account ID does not exist", key)),
+        }
     }
 
-    pub fn put(&mut self, key: &[u8], value: &[u8]) {
+    pub fn create_account(&mut self, key: &[u8], value: &[u8]) -> Result<(), String> {
         // Write operations are atomic by default
         // 'put' operation ensure that each write is fully committed or not committed at all
         let mut batch = WriteBatch::default(); // 개별 쓰기가 아닌 일괄 batch 처리
+
+        // if let Ok(_) = self.get(key) {
+        //     return Err(format!("Error: The [{:?}] account ID already exist", key))
+        // }
+        //
+        // batch.put(key, value);
+        // self.db.write_opt(batch,&self.write_opts).unwrap();
+        // Ok(())
+        match self.get(key) {
+            Ok(Some(_)) => Err(format!("Error: The [{:?}] account ID already exists", key)),
+            _ => {
+                batch.put(key, value);
+                self.db.write_opt(batch, &self.write_opts)
+                    .map_err(|e| format!("Error: Failed to write to database: {:?}", e))
+            }
+        }
+    }
+
+    pub fn update(&mut self, key: &[u8], value: &[u8]) -> Result<(), String> {
+        let mut batch = WriteBatch::default();
+        if let Err(_) = self.get(key) {
+            return Err(format!("Error: The [{:?}] account ID is not exist", key))
+        }
+
         batch.put(key, value);
-        self.db.write_opt(batch,&self.write_opts).unwrap();
+        self.db.write_opt(batch, &self.write_opts)
+            .map_err(|e| format!("Error: Failed to write to database: {:?}", e))
     }
 }
 
@@ -73,35 +104,66 @@ impl DBPool {
         }
     }
 
-    pub fn get_information(&mut self, account_id: &[u8], shard_path: String) {
+    pub fn get_information(&mut self, account_id: &[u8], shard_path: String) -> Result<Option<Vec<u8>>, String> {
         let now = Instant::now();
         // if self contains the database
-        if let Some(database) = self.pool.get(&shard_path) {
+        let databases = Arc::get_mut(&mut self.pool).unwrap();
+        if let Some(database) = databases.get(&shard_path) {
             let db = database.lock().unwrap();
-            db.get(account_id);
+            let result = db.get(account_id).expect("Account retrieval failure");
             self.last_accessed.insert(shard_path, now);
-            return
+            return Ok(result)
         }
         // if self does not contains the database
-        let database = Arc::new(Mutex::new(Database::new(&shard_path)));
-        let mut databases = Arc::make_mut(&mut self.pool);
-        {
-            let db = database.lock().unwrap();
-            db.get(account_id);
+        let metadata = fs::metadata(&shard_path); // 경로가 잘못되어도 무분별한 생성을 막기 위한 초석.
+        if metadata.is_ok() && metadata.unwrap().is_dir() {
+            let mut result = Some(Vec::new());
+            let database = Arc::new(Mutex::new(Database::new(&shard_path)));
+            {
+                let db = database.lock().unwrap();
+                result = db.get(account_id).expect("Account retrieval failure");
+            }
+            databases.insert(shard_path.clone(), database);
+            self.last_accessed.insert(shard_path.clone(), now);
+            return Ok(result)
         }
-        databases.insert(shard_path.clone(), database);
-        self.last_accessed.insert(shard_path, now);
+
+        // 경로에 메타데이터가 없을 경우, invalid 경로 error 반환
+        Err(format!("Error: invalid shard_path {}", shard_path))
     }
 
-    // pub fn put_account(&self, account_id: &[u8], value: &[u8]) {
-    //     let shard_index = self.get_shard_index(account_id);
-    //     let mut database = self.pool[shard_index].lock().unwrap();
-    //     database.put(account_id, value);
-    // }
+    // sign-in 했을 경우에만 수행하는 함수
+    pub fn put_account(&mut self, shard_path: String, key: &[u8], val: &[u8]) -> Result<(), String> {
+        let now = Instant::now();
+        let databases = Arc::get_mut(&mut self.pool).unwrap();
+
+        // if self contains the database
+        if let Some(database) = databases.get_mut(&shard_path) {
+            let mut db = database.lock().unwrap();
+            db.create_account(key, val).expect("account creation failure");
+            self.last_accessed.insert(shard_path, now);
+            return Ok(())
+        }
+        // if self does not contains the database
+        let metadata = fs::metadata(&shard_path); // 경로가 잘못되어도 무분별한 생성을 막기 위한 초석.
+        if metadata.is_ok() && metadata.unwrap().is_dir() {
+            let database = Arc::new(Mutex::new(Database::new(&shard_path)));
+            let mut databases = Arc::make_mut(&mut self.pool);
+            {
+                let mut db = database.lock().unwrap();
+                db.create_account(key, val).expect("account creation failure");
+            }
+            databases.insert(shard_path.clone(), database);
+            self.last_accessed.insert(shard_path.clone(), now);
+            return Ok(())
+        }
+
+        // 경로에 메타데이터가 없을 경우, invalid 경로 error 반환
+        Err(format!("Error: invalid shard_path {}", shard_path))
+    }
 
     pub fn remove_inactive_database(&mut self) {
         let mut databases = Arc::make_mut(&mut self.pool);
-        let now = Instant::now();
         self.last_accessed.retain(|k, v| {
             let elapsed_time = v.elapsed().as_secs();
             if elapsed_time >= 14400 {
