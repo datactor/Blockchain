@@ -1,4 +1,5 @@
 use std::{cmp, collections::HashMap, fs, sync::{Arc, Mutex}, time::{Duration, Instant}};
+use std::sync::{LockResult, MutexGuard};
 
 use crate::{Account, Hash, Pubkey};
 use bs58::{encode, decode};
@@ -61,13 +62,24 @@ impl Database {
 
     pub fn update(&mut self, key: &[u8], value: &[u8]) -> Result<(), String> {
         let mut batch = WriteBatch::default();
-        if let Err(_) = self.get(key) {
-            return Err(format!("Error: The [{:?}] account ID is not exist", key))
-        }
 
-        batch.put(key, value);
-        self.db.write_opt(batch, &self.write_opts)
-            .map_err(|e| format!("Error: Failed to write to database: {:?}", e))
+        match self.get(key) {
+            Ok(opt_val) => {
+                match opt_val {
+                    Some(val) => {
+                        let mut new_value = val;
+                        // 해싱을 풀고 필드마다 value들을 모두 찾아서 추가 후에 value를 업데이트 해야함
+                        new_value.extend(value);
+                        batch.put(key, new_value)
+                    },
+                    None => batch.put(key, value),
+                }
+
+                self.db.write_opt(batch, &self.write_opts)
+                    .map_err(|e| format!("Error: Failed to write to database: {:?}", e))
+            },
+            Err(_) => Err(format!("Error: The [{:?}] account ID is not exist", key)),
+        }
     }
 }
 
@@ -91,6 +103,36 @@ impl DBPool {
             max_dbs,
         }
     }
+
+    fn get_database(&mut self, shard_path: String) -> Result<Arc<Mutex<Database>>, String> {
+        let now = Instant::now();
+        let mut databases = Arc::get_mut(&mut self.pool).unwrap();
+        if let Some(database) = databases.get(&shard_path) {
+            // if database is already open, return it
+            self.last_accessed.insert(shard_path, now);
+            return Ok(Arc::clone(database));
+        }
+
+        // check if maximum number of databases has been reached
+        if databases.len() >= self.max_dbs {
+            self.remove_inactive_database();
+        }
+
+        databases = Arc::get_mut(&mut self.pool).unwrap();
+
+        // load the database lazily
+        let metadata = fs::metadata(shard_path.to_owned());
+        if metadata.is_ok() && metadata.unwrap().is_dir() {
+            let database = Arc::new(Mutex::new(Database::new(&shard_path)));
+            databases.insert(shard_path.to_owned(), Arc::clone(&database));
+            self.last_accessed.insert(shard_path.to_owned(), now);
+            return Ok(database)
+        }
+
+        // 경로에 메타데이터가 없을 경우, invalid 경로 error 반환
+        Err(format!("Error: invalid shard_path {}", shard_path))
+    }
+
 
     pub fn get_information(&mut self, account_id: &[u8], shard_path: String) -> Result<Option<Vec<u8>>, String> {
         let now = Instant::now();
@@ -201,31 +243,39 @@ impl DBPool {
         });
     }
 }
-// pub struct DBPool {
-//     inner: Arc<Mutex<Database>>,
-// }
-//
-// impl DBPool {
-//     pub fn new(path: &str) -> Self {
-//         Self {
-//             inner: Arc::new(Mutex::new(Database::new(path))),
-//         }
-//     }
-//
-//     fn get_shard_index(&self, key: &[u8]) {}
-//
-//     pub fn get(&self, account_id: &[u8]) -> Option<Vec<u8>> {
-//         let shard_index = self.get_shard_index(account_id);
-//         let db = self.inner.lock().unwrap();
-//         db.get(account_id)
-//     }
-//
-//     pub fn put(&self, account_id: &[u8], value: &[u8]) {
-//         let shard_index = self.get_shard_index(account_id);
-//         let mut db = self.inner.lock().unwrap();
-//         db.put(account_id, value);
-//     }
-// }
+
+struct DBHandler {
+    db_pool: Arc<DBPool>,
+}
+
+impl DBHandler {
+    fn new(db_pool: Arc<DBPool>) -> Self {
+        DBHandler {
+            db_pool
+        }
+    }
+
+    fn handle_request_get(&mut self, shard_path: String, account_id: &[u8]) -> Result<Option<Vec<u8>>, String> {
+        let database = Arc::get_mut(&mut self.db_pool).unwrap().get_database(shard_path)?;
+        let db = database.lock().unwrap();
+
+        db.get(account_id)
+    }
+
+    fn handle_request_create(&mut self, shard_path: String, account_id: &[u8], val: &[u8]) -> Result<(), String> {
+        let database = Arc::get_mut(&mut self.db_pool).unwrap().get_database(shard_path)?;
+        let mut db = database.lock().unwrap();
+
+        db.create_account(account_id, val)
+    }
+
+    fn handle_request_update(&mut self, shard_path: String, account_id: &[u8], val: &[u8]) -> Result<(), String> {
+        let database = Arc::get_mut(&mut self.db_pool).unwrap().get_database(shard_path)?;
+        let mut db = database.lock().unwrap();
+
+        db.update(account_id, val)
+    }
+}
     // pub fn remove_path(&mut self, path: &str) {
     //     self.shard_path.remove_path(path);
     //     let shard_indexes = self.shard_path.get_shard_indexes_for_path(path);
