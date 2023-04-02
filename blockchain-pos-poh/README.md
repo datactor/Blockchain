@@ -474,7 +474,7 @@ validator로 참여하기 위해서는 일정량의 SOL을 스테이킹하고 �
 validator node를 운영해야 한다. validator는 CPU, 메모리 및 스토리지 용량과 같이 네트워크에 참여하는 데
 필요한 컴퓨팅 리소스를 제공할 책임이 있다.
 
-1. validator는 솔라나 네트워크에 연결되고 합의 과정에 참여하는 솔라나 노드를 실행한다.
+1. validator는 솔라나 네트워크에 연결되고 합의 과정에 참여하는 솔라나 노드를 실행한다(여기서 말하는 솔라나 노드가 validator의 구현).
 2. 솔라나 노드는 비동기로 쓰레드를 열고 AccountsPath, transaction from sender to recipient 요청을 기다린다.
 3. 요청이 오면 단순 요청(login, balancing)인지, tx 요청인지 확인한다. AccountID받는다.
 4. 어떤 경우이든 일단 솔라나 네트워크에 AccountID를 보내고 ShardPath or AccountPath를 요청하여 반환받는다.
@@ -581,3 +581,13 @@ DBPool은 validator의 capacity가 한정되어 있기때문에, Pool에 db를 �
 ##### DB::update 메서드 수정하기
 기존 데이터에 값이 존재할 경우, 새로 옮겨진 데이터 또는 변하는 데이터를 각각의 필드를 찾아 합산하여 저장해줘야함.
 hash값을 encoding, decoding만으로는 필드에 따른 값을 정밀하게 찾을 수 없다.
+
+##### DBHandler 구현
+lazy loading으로 필요할 때만 DB를 로딩하도록 DBpool을 필드로 갖는 Handler 구현.
+
+#### 4월 2일
+동시 액세스: 여러 스레드가 동일한 데이터베이스에 액세스할 수 있으므로 경합 상태 또는 교착 상태의 위험이 있다.
+현재 구현에서는 'Mutex'를 사용하여 각 데이터베이스에 대한 액세스를 동기화하지만 동시성이 높은 시나리오에서는 비효율적일 수 있다.
+RwLock 또는 Crossbeam의 범위가 지정된 스레드와 같은 보다 효율적인 동기화 메커니즘을 사용하는 것이 좋다.
+
+범위가 지정된 스레드에서 효율적인 동기화 메커니즘을 사용하기 위한 대한 초석을 다지기 위해 동기화 프리미티브 정리

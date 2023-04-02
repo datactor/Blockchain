@@ -244,14 +244,14 @@ impl DBPool {
     }
 }
 
-struct DBHandler {
-    db_pool: Arc<DBPool>,
+pub struct DBHandler {
+    pub(crate) db_pool: Arc<DBPool>,
 }
 
 impl DBHandler {
-    fn new(db_pool: Arc<DBPool>) -> Self {
+    fn new(max_dbs: usize) -> Self {
         DBHandler {
-            db_pool
+            db_pool: Arc::new(DBPool::new(max_dbs))
         }
     }
 

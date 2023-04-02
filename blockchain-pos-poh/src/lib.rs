@@ -13,7 +13,7 @@ pub mod configmap;
 pub mod repl;
 pub mod token;
 pub mod database;
-// pub mod nodes;
+pub mod nodes;
 pub mod shardpath;
 // pub mod shardable;
 pub mod rate_limiter;
@@ -30,7 +30,7 @@ pub use crate::{
     sys::sys::*,
     repl::login_menu_main,
     transaction::Message,
-    database::{Database, DBPool},
+    database::{Database, DBPool, DBHandler},
     shardpath::ShardPath,
     // shardable::ShardDB,
 };
