@@ -592,6 +592,6 @@ RwLock 또는 Crossbeam의 범위가 지정된 스레드와 같은 보다 효율
 
 범위가 지정된 스레드에서 효율적인 동기화 메커니즘을 사용하기 위한 대한 초석을 다지기 위해 동기화 프리미티브 정리
 
-##### Validator::login 구현
+##### Validator::login, signup, update 구현
 
 ##### Validator에 RateLimiter 필드 추가하여, 과다 요청 방지

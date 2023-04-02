@@ -249,7 +249,7 @@ pub struct DBHandler {
 }
 
 impl DBHandler {
-    fn new(max_dbs: usize) -> Self {
+    pub fn new(max_dbs: usize) -> Self {
         DBHandler {
             db_pool: Arc::new(DBPool::new(max_dbs))
         }
