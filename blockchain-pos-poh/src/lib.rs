@@ -32,6 +32,7 @@ pub use crate::{
     transaction::Message,
     database::{Database, DBPool, DBHandler},
     shardpath::ShardPath,
+    rate_limiter::RateLimiter,
     // shardable::ShardDB,
 };
 

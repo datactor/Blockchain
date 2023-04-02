@@ -245,7 +245,7 @@ impl DBPool {
 }
 
 pub struct DBHandler {
-    pub(crate) db_pool: Arc<DBPool>,
+    pub db_pool: Arc<DBPool>,
 }
 
 impl DBHandler {
@@ -255,21 +255,21 @@ impl DBHandler {
         }
     }
 
-    fn handle_request_get(&mut self, shard_path: String, account_id: &[u8]) -> Result<Option<Vec<u8>>, String> {
+    pub fn handle_request_get(&mut self, shard_path: String, account_id: &[u8]) -> Result<Option<Vec<u8>>, String> {
         let database = Arc::get_mut(&mut self.db_pool).unwrap().get_database(shard_path)?;
         let db = database.lock().unwrap();
 
         db.get(account_id)
     }
 
-    fn handle_request_create(&mut self, shard_path: String, account_id: &[u8], val: &[u8]) -> Result<(), String> {
+    pub fn handle_request_create(&mut self, shard_path: String, account_id: &[u8], val: &[u8]) -> Result<(), String> {
         let database = Arc::get_mut(&mut self.db_pool).unwrap().get_database(shard_path)?;
         let mut db = database.lock().unwrap();
 
         db.create_account(account_id, val)
     }
 
-    fn handle_request_update(&mut self, shard_path: String, account_id: &[u8], val: &[u8]) -> Result<(), String> {
+    pub fn handle_request_update(&mut self, shard_path: String, account_id: &[u8], val: &[u8]) -> Result<(), String> {
         let database = Arc::get_mut(&mut self.db_pool).unwrap().get_database(shard_path)?;
         let mut db = database.lock().unwrap();
 

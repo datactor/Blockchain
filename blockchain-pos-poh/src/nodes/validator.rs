@@ -1,39 +1,25 @@
 use std::sync::Arc;
-use crate::{Account, DBHandler, DBPool, Pubkey, ShardPath};
+use std::time::Duration;
+use crate::{Account, DBHandler, DBPool, Pubkey, ShardPath, RateLimiter};
 
 struct Validator {
-    // shard_path: ShardPath,
-    handler: DBHandler,
+    handler: Arc<DBHandler>,
+    rate_limiter: RateLimiter,
 }
 
 impl Validator {
-    fn new(account: &[u8], max_dbs: usize) -> Validator {
+    fn new(max_dbs: usize, max_requests: u32, time_frame: Duration) -> Validator {
         // Initialize validator
         Validator {
-            handler: DBHandler {
+            handler: Arc::new(DBHandler {
                 db_pool: Arc::new(DBPool::new(max_dbs))
-            },
+            }),
+            rate_limiter: RateLimiter::new(max_requests, time_frame),
         }
     }
 
-    // fn login(&mut self, account_id: u64, pubkey: Pubkey) -> Result<Account, String> {
-    //     // Find the shard and lock it with ShardPath
-    //     let shard = self.shard_path.get_shard(account_id);
-    //     let shard_guard = shard.lock().unwrap();
-    //
-    //     // Get the chunk index for the account and lock it with AccountPath
-    //     let chunk_idx = self.account_path.get_chunk_idx(account_id);
-    //     let chunk_guard = shard_guard.accounts[chunk_idx].lock().unwrap();
-    //
-    //     // Access account data from chunk
-    //     let account = chunk_guard.get_account(account_id);
-    //
-    //     // Verify account pubkey matches input pubkey
-    //     if account.pubkey != pubkey {
-    //         return Err(String::from("Public key does not match account"));
-    //     }
-    //
-    //     // Return the account
-    //     Ok(account)
-    // }
+    fn login(&mut self, shard_path: String, account_id: &[u8]) -> Result<Option<Vec<u8>>, String> {
+        let db_pool = Arc::get_mut(&mut self.handler).unwrap();
+        db_pool.handle_request_get(shard_path, account_id)
+    }
 }

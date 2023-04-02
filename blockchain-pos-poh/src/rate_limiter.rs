@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-struct RateLimiter {
+pub struct RateLimiter {
     limits: HashMap<String, Instant>,
     max_requests: u32,
     time_frame: Duration,
