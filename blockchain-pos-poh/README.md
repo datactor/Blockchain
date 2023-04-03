@@ -595,3 +595,7 @@ RwLock 또는 Crossbeam의 범위가 지정된 스레드와 같은 보다 효율
 ##### Validator::login, signup, update 구현
 
 ##### Validator에 RateLimiter 필드 추가하여, 과다 요청 방지
+
+#### 4월 3일
+Atomic types & Ordering guarantees  
+https://github.com/datactor/rust-problem-solving/blob/main/forge/rust_concepts_explained/arc_mutex.md
