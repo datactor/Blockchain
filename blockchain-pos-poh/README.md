@@ -599,3 +599,19 @@ RwLock 또는 Crossbeam의 범위가 지정된 스레드와 같은 보다 효율
 #### 4월 3일
 Atomic types & Ordering guarantees  
 https://github.com/datactor/rust-problem-solving/blob/main/forge/rust_concepts_explained/arc_mutex.md
+
+#### 4월 4일
+Atomic types & Ordering guarantees  
+
+#### 4월 5일
+Atomic types & Ordering guarantees  
+
+#### 4월 6일
+Atomic types & Ordering guarantees  
+
+#### 4월 7일
+spin-lock을 사용해서 Condvar를 기다리는 Barrier의 대체재:
+tree Barrier & tournament barrier.
+tree barrier는 이름에서 알 수 있듯이 참여 스레드 간에 트리 구조를 형성하고 각 스레드는 진행하기 전에 부모와 자식이 barrier에 도착하기를 기다린다.
+이는 spin barrier에 비해 더 나은 캐시 활용과 경합 감소로 이어질 수 있다.
+(merkle tree 해싱 연산을 구현할 때 다중 스레드에 분산 연산으로 분배하고, tree-barrier를 고려해보자)
