@@ -613,5 +613,17 @@ Atomic types & Ordering guarantees
 spin-lock을 사용해서 Condvar를 기다리는 Barrier의 대체재:
 tree Barrier & tournament barrier.
 tree barrier는 이름에서 알 수 있듯이 참여 스레드 간에 트리 구조를 형성하고 각 스레드는 진행하기 전에 부모와 자식이 barrier에 도착하기를 기다린다.
-이는 spin barrier에 비해 더 나은 캐시 활용과 경합 감소로 이어질 수 있다.
+이는 spin barrier에 비해 더 나은 캐시 활용과 경합 감소로 이어질 수 있다.  
 (merkle tree 해싱 연산을 구현할 때 다중 스레드에 분산 연산으로 분배하고, tree-barrier를 고려해보자)
+
+#### 4월 8일
+##### update semaphore
+
+##### deadlock을 방지하는 해결책 중 상황에 맞는 가장 효율적인 방법 고려하기.
+lock ordering으로 순서를 직접 정하는 방식은 programmer에게 전적으로 책임이 전가된다.
+1. lock ordering + barrier 동기로 각 프로세스에 대해서 여러 리소스에 대한 의존성을 줄이고 기다리게 하는 방식
+2. lock ordering + consistent Ring
+3. lock ordering + timeout mechanism
+4. lock ordering + std::sync::DeadlockDetection으로 deadlock 감시
+5. lock ordering + Rwlock
+각 사용 사례의 특정 요구 사항을 고려하고 가장 적절한 primitives 선택하기
