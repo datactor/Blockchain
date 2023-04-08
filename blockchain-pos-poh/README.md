@@ -598,7 +598,7 @@ RwLock 또는 Crossbeam의 범위가 지정된 스레드와 같은 보다 효율
 
 #### 4월 3일
 Atomic types & Ordering guarantees  
-https://github.com/datactor/Rustic-data-solving/blob/main/forge/rust_concepts_explained/advanced_sync_primitives.md
+https://github.com/datactor/Rustic-data-solving/blob/main/forge/rust_concepts_explained/advanced_sync_primitives1.md
 
 #### 4월 4일
 Atomic types & Ordering guarantees  
