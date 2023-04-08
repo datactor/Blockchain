@@ -598,7 +598,7 @@ RwLock 또는 Crossbeam의 범위가 지정된 스레드와 같은 보다 효율
 
 #### 4월 3일
 Atomic types & Ordering guarantees  
-https://github.com/datactor/rust-problem-solving/blob/main/forge/rust_concepts_explained/arc_mutex.md
+https://github.com/datactor/Rustic-data-solving/blob/main/forge/rust_concepts_explained/advanced_sync_primitives.md
 
 #### 4월 4일
 Atomic types & Ordering guarantees  
@@ -610,6 +610,8 @@ Atomic types & Ordering guarantees
 Atomic types & Ordering guarantees  
 
 #### 4월 7일
+Atomic types & Ordering guarantees  
+
 spin-lock을 사용해서 Condvar를 기다리는 Barrier의 대체재:
 tree Barrier & tournament barrier.
 tree barrier는 이름에서 알 수 있듯이 참여 스레드 간에 트리 구조를 형성하고 각 스레드는 진행하기 전에 부모와 자식이 barrier에 도착하기를 기다린다.
@@ -617,6 +619,8 @@ tree barrier는 이름에서 알 수 있듯이 참여 스레드 간에 트리 �
 (merkle tree 해싱 연산을 구현할 때 다중 스레드에 분산 연산으로 분배하고, tree-barrier를 고려해보자)
 
 #### 4월 8일
+Atomic types & Ordering guarantees
+
 ##### update semaphore
 
 ##### deadlock을 방지하는 해결책 중 상황에 맞는 가장 효율적인 방법 고려하기.
@@ -627,3 +631,24 @@ lock ordering으로 순서를 직접 정하는 방식은 programmer에게 전적
 4. lock ordering + std::sync::DeadlockDetection으로 deadlock 감시
 5. lock ordering + Rwlock
 각 사용 사례의 특정 요구 사항을 고려하고 가장 적절한 primitives 선택하기
+
+#### 4월 9일
+Atomic types & Ordering guarantees
+
+##### update Mutex
+
+##### Once
+개념정리, 분산처리에서 Once의 용도?
+여러 스레드에서도 정확히 한번 수행하는 Once의 특성을 이용해서 초기에 Expensive initialization 과정을 Once로 진행.  
+또는 exactly once 작업의 수행 구현을 Once의 사용을 고려.
+그러나 Once가 실패시, 더이상 그 작업에 대해서 시도하지 않기 때문에, 실패할 경우를 항상 염두에 두고 있어야 한다.
+
+##### RwLock
+다중 스레드에서 공유데이터에 대한 read/write 옵션을 따로 사용하여 구현할 때 사용.
+write에 대해서만 상호 배타적 독점 lock을 걸고, read에 대해서는 다중 스레드에서 동시 접근이 가능한 lock을 건다.
+이는 Rust의 borrow rule과 비슷한 논리로 작동한다.
+
+RwLock은 spin-lock과 CAS, atomic primitives로 구현되었으며 spin-lock의 단점을 futex의 활성/비활성 전환 기능을 활용하여 상쇄한다.
+또한 내부의 `wake_writer_or_readers()` 메서드로 대기 중인 reader와 writer를 특정 순서로 깨워
+ordering을 부여해, deadlock을 방지하고, read lock에 대해서는 다중 스레드의 접근을 허용하여 경합을 없애 오버헤드를 줄였다.
+또한 writer에게는 상호 베타적 독점 lock이지만, 우선순위를 지정하여 공유 데이터에 엑세스할 공정한 기회를 갖도록 보장한다.
