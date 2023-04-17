@@ -147,8 +147,7 @@ wrapping된 토큰을 사용하여 이더리움 기반 자산을 솔라나의 �
 다른 프로토콜로 보낼때나 그로부터 받을때는 그에 맞는 방식으로 wrapping하여 lock하거나 unwrapping한다.)
 
 ### Raydium program
-또 다른 DEX로 유동성 pool 및 yield farming을 가능하게 해준다.
-
+유동성 pool 및 yield farming을 가능하게 해준다.
 
 #### Transaction processing
 
@@ -163,9 +162,8 @@ The software that can manage private keys and interact with your blockchain.
 The tools and libraries that can be used for developing and deploying smart contracts, interacting with the blockchain, and testing the network.
 
 
-### Todo!();
 이 코드는 샤딩되지 않은 input_dbs를 기존의 샤딩된 샤드들 중 완전하지 않은 샤드 1개와 결합해서 새로운 샤드를 만들고,
-계속해서 새로운 샤드들을 추가로 만들거나, 기존의 샤딩된 샤드들이 없다면 새롭게 input_dbs들을 샤드로 나누는 작업임.
+계속해서 새로운 샤드들을 추가로 만들거나, 기존의 샤딩된 샤드들이 없다면 새롭게 input_dbs들을 샤드로 나누는 작업이다.
 
 몇가지 문제가 있어보인다.
 1. 
@@ -285,7 +283,6 @@ shard_dbs.push(db);
       리소스사용과 확장성의 균형을 맞춰보자.
    
    4번으로 가보자
-
 
 3. shard Option
 
