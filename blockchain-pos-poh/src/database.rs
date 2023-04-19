@@ -1,9 +1,15 @@
-use std::{cmp, collections::HashMap, fs, sync::{Arc, Mutex}, time::{Duration, Instant}};
-use std::sync::{LockResult, MutexGuard};
+use std::{
+    cmp,
+    collections::HashMap,
+    fs,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant}
+};
 
 use crate::{Account, Hash, Pubkey};
 use bs58::{encode, decode};
 use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions, IteratorMode, DBWithThreadMode, SingleThreaded, Error};
+use parking_lot::RwLock;
 
 use crate::ShardPath;
 
@@ -85,7 +91,7 @@ impl Database {
 
 // validator는 캐시하는 것 처럼 DB들을 집합으로 DBPool로 만들어서 저장하고 있다.
 pub struct DBPool {
-    pool: Arc<HashMap<String, Arc<Mutex<Database>>>>,
+    pool: Arc<HashMap<String, Arc<RwLock<Database>>>>,
     last_accessed: HashMap<String, Instant>,
     max_dbs: usize,
 }
@@ -104,7 +110,7 @@ impl DBPool {
         }
     }
 
-    fn get_database(&mut self, shard_path: String) -> Result<Arc<Mutex<Database>>, String> {
+    fn get_database(&mut self, shard_path: String) -> Result<Arc<RwLock<Database>>, String> {
         let now = Instant::now();
         let mut databases = Arc::get_mut(&mut self.pool).unwrap();
         if let Some(database) = databases.get(&shard_path) {
@@ -123,7 +129,7 @@ impl DBPool {
         // load the database lazily
         let metadata = fs::metadata(shard_path.to_owned());
         if metadata.is_ok() && metadata.unwrap().is_dir() {
-            let database = Arc::new(Mutex::new(Database::new(&shard_path)));
+            let database = Arc::new(RwLock::new(Database::new(&shard_path)));
             databases.insert(shard_path.to_owned(), Arc::clone(&database));
             self.last_accessed.insert(shard_path.to_owned(), now);
             return Ok(database)
@@ -139,7 +145,7 @@ impl DBPool {
         // if self contains the database
         let mut databases = Arc::get_mut(&mut self.pool).unwrap();
         if let Some(database) = databases.get(&shard_path) {
-            let db = database.lock().unwrap();
+            let db = database.read();
             let result = db.get(account_id).expect("Account retrieval failure");
             self.last_accessed.insert(shard_path, now);
             return Ok(result)
@@ -158,9 +164,9 @@ impl DBPool {
         let metadata = fs::metadata(&shard_path); // 경로가 잘못되어도 무분별한 생성을 막기 위한 초석.
         if metadata.is_ok() && metadata.unwrap().is_dir() {
             let mut result = Some(Vec::new());
-            let database = Arc::new(Mutex::new(Database::new(&shard_path)));
+            let database = Arc::new(RwLock::new(Database::new(&shard_path)));
             {
-                let db = database.lock().unwrap();
+                let db = database.read();
                 result = db.get(account_id).expect("Account retrieval failure");
             }
             databases.insert(shard_path.clone(), database);
@@ -179,7 +185,7 @@ impl DBPool {
 
         // if self contains the database
         if let Some(database) = databases.get_mut(&shard_path) {
-            let mut db = database.lock().unwrap();
+            let mut db = database.write();
             db.create_account(key, val).expect("account creation failure");
             self.last_accessed.insert(shard_path, now);
             return Ok(())
@@ -197,9 +203,9 @@ impl DBPool {
         // if self does not contains the database
         let metadata = fs::metadata(&shard_path); // 경로가 잘못되어도 무분별한 생성을 막기 위한 초석.
         if metadata.is_ok() && metadata.unwrap().is_dir() {
-            let database = Arc::new(Mutex::new(Database::new(&shard_path)));
+            let database = Arc::new(RwLock::new(Database::new(&shard_path)));
             {
-                let mut db = database.lock().unwrap();
+                let mut db = database.write();
                 db.create_account(key, val).expect("account creation failure");
             }
             databases.insert(shard_path.clone(), database);
@@ -217,7 +223,7 @@ impl DBPool {
 
         // Calculate usage patterns for each database
         for (shard_path, database) in databases.iter() {
-            let db = database.lock().unwrap();
+            let db = database.write();
             let stats = db.db.property_int_value("rocksdb.estimate-live-data-size").unwrap_or(Some(0));
             database_usage.insert(shard_path.to_owned(), stats.unwrap_or(0));
         }
@@ -257,21 +263,21 @@ impl DBHandler {
 
     pub fn handle_request_get(&mut self, shard_path: String, account_id: &[u8]) -> Result<Option<Vec<u8>>, String> {
         let database = Arc::get_mut(&mut self.db_pool).unwrap().get_database(shard_path)?;
-        let db = database.lock().unwrap();
+        let db = database.read();
 
         db.get(account_id)
     }
 
     pub fn handle_request_create(&mut self, shard_path: String, account_id: &[u8], val: &[u8]) -> Result<(), String> {
         let database = Arc::get_mut(&mut self.db_pool).unwrap().get_database(shard_path)?;
-        let mut db = database.lock().unwrap();
+        let mut db = database.write();
 
         db.create_account(account_id, val)
     }
 
     pub fn handle_request_update(&mut self, shard_path: String, account_id: &[u8], val: &[u8]) -> Result<(), String> {
         let database = Arc::get_mut(&mut self.db_pool).unwrap().get_database(shard_path)?;
-        let mut db = database.lock().unwrap();
+        let mut db = database.write();
 
         db.update(account_id, val)
     }
