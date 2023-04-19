@@ -2,7 +2,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::collections::{HashMap, HashSet};
 
 use crate::block::Block;
-use crate::{Blockchain, Hash, Pubkey, Token};
+use crate::{Blockchain, Hash, Pubkey, Token, entrypoint::{self, ProgramResult}, Account};
+
+pub const ID: Pubkey = Pubkey::const_new([0u8; 32]);
+
+
 
 #[derive(Clone)]
 pub struct ProgramAccount {

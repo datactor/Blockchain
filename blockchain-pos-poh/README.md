@@ -649,3 +649,9 @@ RwLock은 spin-lock과 CAS, atomic primitives로 구현되었으며 spin-lock의
 또한 내부의 `wake_writer_or_readers()` 메서드로 대기 중인 reader와 writer를 특정 순서로 깨워
 ordering을 부여해, deadlock을 방지하고, read lock에 대해서는 다중 스레드의 접근을 허용하여 경합을 없애 오버헤드를 줄였다.
 또한 writer에게는 상호 베타적 독점 lock이지만, 우선순위를 지정하여 공유 데이터에 엑세스할 공정한 기회를 갖도록 보장한다.
+
+#### 4월 19일
+솔라나의 초기 수행은 단일 스레드에서 수행한다.
+즉, sys 프로그램, mint 프로그램, token 프로그램의 init에 시퀀스를 부여하여,
+솔라나의 상태를 결정론적으로 유지하기 위함이다. 그 이후에 app 내부의 각각의 기능들은 비동기로 병렬로 처리한다.
+

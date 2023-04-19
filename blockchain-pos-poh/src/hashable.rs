@@ -118,6 +118,10 @@ impl std::fmt::Debug for Privatekey {
 pub struct Pubkey(pub(crate) [u8; 32]);
 
 impl Pubkey {
+    pub const fn const_new(pubkey_bytes: [u8; 32]) -> Self {
+        Pubkey(pubkey_bytes)
+    }
+
     pub fn new(pubkey_bytes: [u8; 32]) -> Self {
         let mut arr = [0u8; 32];
         arr[..pubkey_bytes.len()].copy_from_slice(&pubkey_bytes);

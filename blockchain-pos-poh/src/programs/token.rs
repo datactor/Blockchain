@@ -2,6 +2,8 @@ use crate::{Account, Pubkey};
 use crate::Mint;
 use std::collections::HashMap;
 
+pub const ID: Pubkey = Pubkey::const_new([1u8; 32]);
+
 pub struct Token {
     // Solana에서 각 계정은 고유한 주소를 가지며 accountDB는 본질적으로 계정 주소가 키이고 account 데이터가 값인
     // 키-값 데이터베이스이다. 각 account를 iter하지 않고 accountDB에서 총 계정 잔액 합계를 빠르게 얻기 위해

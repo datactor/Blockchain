@@ -2,6 +2,8 @@
 
 use crate::{Pubkey, Token};
 
+pub const ID: Pubkey = Pubkey::const_new([2u8; 32]);
+
 pub struct Mint {
     pub total_supply: u64,
     pub mint_authority: Pubkey,
