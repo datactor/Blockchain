@@ -18,4 +18,5 @@ pub fn start(program_id: Pubkey) -> ProgramResult {
     //     mint::ID => mint::entrypoint(&mint::ID, &mut mint::get_context()?),
     //     _ => Err(entrypoint::ProgramError::InvalidAccountData),
     // }
+    Ok(())
 }
