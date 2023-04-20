@@ -6,7 +6,7 @@ use std::{
 
 use super::*;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Block {
     // version: u64,
     signature: Signature,
@@ -140,7 +140,7 @@ impl Block {
 impl Default for Block {
     fn default() -> Self {
         Self {
-            signature: [0u8; 64],
+            signature: Signature([0u8; 64]),
             slot: 0,
             timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
             parent_timestamp: 0,
@@ -164,7 +164,7 @@ impl Hashable for Block {
         //             transactions,
         //             transaction_count: transactions.len() as u64,
 
-        bytes.extend(&self.signature);
+        bytes.extend(&self.signature.0);
         bytes.extend(U64Bytes::from(&self.slot).data);
         bytes.extend(U64Bytes::from(&self.parent_timestamp).data);
         bytes.extend(U64Bytes::from(&self.timestamp).data);

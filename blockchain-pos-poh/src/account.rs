@@ -66,7 +66,7 @@ impl Hashable for Account {
             bytes.push(0x00);
         };
         if let Some(signature) = &self.signature {
-            bytes.extend(signature);
+            bytes.extend(signature.0);
         } else {
             bytes.push(0x00);
         }

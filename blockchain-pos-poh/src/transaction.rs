@@ -26,7 +26,7 @@ use super::*;
 // 5. 명령이 성공적으로 실행되면 tx가 ledger에 commit되고 user의 account balance가 업데이트 된다.
 
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Transaction { // 서명된 집합. 네트워크에 브로드캐스트되는 명령의 수
     pub signatures: Vec<Signature>, // Tx를 인증하는데 사용됨
     pub sender: Pubkey,
@@ -121,7 +121,7 @@ impl Hashable for Transaction {
     fn update(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         for signature in &self.signatures {
-            bytes.extend(signature);
+            bytes.extend(signature.0);
         }
         bytes.extend(&self.sender.0);
         bytes.extend(&self.recipient.0);

@@ -8,7 +8,7 @@ use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions
 use serde::{Serialize, Deserialize};
 
 use crate::block::Block;
-use crate::{Blockchain, Hash, Pubkey, Token, Account, Database, DBHandler, Mint};
+use crate::{Blockchain, Hash, Pubkey, Token, Account, Database, DBHandler, Mint, Signature};
 
 pub const SYS_ID: Pubkey = Pubkey::const_new([0u8; 32]);
 pub const TOKEN_ID: Pubkey = Pubkey::const_new([1u8; 32]);
@@ -41,7 +41,7 @@ pub struct ProgramAccount {
     pub executable: bool,
 }
 
-// #[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Sys {
     pub current_block: Block,
     // pub block_hash: HashSet<Hash>,
@@ -49,19 +49,19 @@ pub struct Sys {
 }
 
 impl Sys {
-    // pub fn to_file(&self, filepath: &str) -> io::Result<()> {
-    //     let mut file = File::create(filepath)?;
-    //     let serialized = serde_json::to_string(self)?;
-    //     file.write_all(serialized.as_bytes())?;
-    //     Ok(())
-    // }
-    //
-    // pub fn from_file(filepath: &str) -> io::Result<Sys> {
-    //     let file = File::open(filepath)?;
-    //     let reader = BufReader::new(file);
-    //     let sys: Sys = serde_json::from_reader(reader)?;
-    //     Ok(sys)
-    // }
+    pub fn to_file(&self, filepath: &str) -> io::Result<()> {
+        let mut file = File::create(filepath)?;
+        let serialized = serde_json::to_string(self)?;
+        file.write_all(serialized.as_bytes())?;
+        Ok(())
+    }
+
+    pub fn from_file(filepath: &str) -> io::Result<Sys> {
+        let file = File::open(filepath)?;
+        let reader = BufReader::new(file);
+        let sys: Sys = serde_json::from_reader(reader)?;
+        Ok(sys)
+    }
 
     pub fn create_sys_account() -> Option<Sys> {
         let sys_program_id = SYS_ID;
@@ -115,7 +115,7 @@ impl Sys {
     pub fn create_block(&mut self) -> Block {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         let mut block = Block::new(
-            [0u8; 64],
+            Signature([0u8; 64]),
             self.current_block.slot,
             self.current_block.timestamp,
             timestamp,

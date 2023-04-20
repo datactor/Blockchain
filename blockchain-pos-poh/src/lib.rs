@@ -45,14 +45,53 @@ pub use crate::{
     entrypoint::ProgramResult,
 };
 
-type Signature = [u8; 64];
+// type Signature = [u8; 64];
 
-// struct Signature(pub [u8; 64]);
+#[derive(Debug)]
+struct SignatureError;
+
+impl std::fmt::Display for SignatureError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Invalid signature")
+    }
+}
+
+impl std::error::Error for SignatureError {}
+
+#[derive(Clone, Debug)]
+pub struct Signature(pub [u8; 64]);
+
+impl Serialize for Signature {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+    {
+        let hex_str = hex::encode(self.0);
+        serializer.serialize_str(&hex_str)
+    }
+}
+
+impl<'de> Deserialize<'de> for Signature {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+    {
+        let hex_str = String::deserialize(deserializer)?;
+        let bytes = hex::decode(hex_str)
+            .map_err(|_e| serde::de::Error::custom(SignatureError))?;
+        if bytes.len() != 64 {
+            return Err(serde::de::Error::custom(SignatureError));
+        }
+        let mut arr = [0u8; 64];
+        arr.copy_from_slice(&bytes[..]);
+        Ok(Signature(arr))
+    }
+}
 
 impl Hashable for Signature {
     fn update(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(self.as_ref());
+        bytes.extend_from_slice(self.0.as_ref());
         bytes
     }
 }
