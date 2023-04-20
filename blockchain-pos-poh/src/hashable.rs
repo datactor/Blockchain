@@ -8,6 +8,8 @@ use ring::{
 };
 use bs58::{decode, encode};
 use ring::error::Unspecified;
+use serde::{Serialize, Deserialize};
+use serde_json::{Serializer, Deserializer};
 
 // Digest of SHA256 is always 256bit [u8; 32].
 // if [u8; 128] as an input, wouldn't there be a conflict due to duplicate values?
@@ -55,7 +57,7 @@ pub trait Hashable {
     }
 }
 
-#[derive(Eq, Hash, PartialEq, Clone, Copy)]
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct Hash(pub [u8; 32]);
 
 impl Hash {
@@ -114,7 +116,7 @@ impl std::fmt::Debug for Privatekey {
 }
 
 
-#[derive(Eq, Hash, PartialEq, Clone, Copy)]
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct Pubkey(pub(crate) [u8; 32]);
 
 impl Pubkey {

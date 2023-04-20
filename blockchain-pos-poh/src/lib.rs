@@ -1,5 +1,7 @@
 use chrono::prelude::*;
 use ring::signature::{Ed25519KeyPair, UnparsedPublicKey, ED25519};
+use serde::{Serialize, Deserialize};
+use serde_json::{Serializer, Deserializer};
 
 pub mod block;
 pub mod blockchain;
@@ -44,6 +46,8 @@ pub use crate::{
 };
 
 type Signature = [u8; 64];
+
+// struct Signature(pub [u8; 64]);
 
 impl Hashable for Signature {
     fn update(&self) -> Vec<u8> {

@@ -133,21 +133,21 @@ impl Hashable for Transaction {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Message {
     pub header: MessageHeader, // 필수 account address와 메타데이터 저장
     pub account_keys: Vec<Pubkey>, // msg가 의존하는 account address의 배열
     pub recent_blockhash: Hash, // prevent reply attack
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct MessageHeader {
     pub num_required_signatures: u8,
     pub num_readonly_signed_accounts: u8,
     pub num_readonly_unsigned_accounts: u8,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CompiledInstruction {
     pub program_id_index: u8,
     pub accounts: Vec<u8>,

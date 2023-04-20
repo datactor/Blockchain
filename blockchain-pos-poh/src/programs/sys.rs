@@ -1,14 +1,39 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::collections::{HashMap, HashSet};
+use std::{
+    fs::File,
+    io::{self, prelude::*, BufReader},
+    time::{SystemTime, UNIX_EPOCH},
+    collections::{HashMap, HashSet},
+};
+use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions, IteratorMode, DBWithThreadMode, SingleThreaded, Error};
+use serde::{Serialize, Deserialize};
 
 use crate::block::Block;
-use crate::{Blockchain, Hash, Pubkey, Token, entrypoint::{self, ProgramResult}, Account};
+use crate::{Blockchain, Hash, Pubkey, Token, Account, Database, DBHandler, Mint};
 
-pub const ID: Pubkey = Pubkey::const_new([0u8; 32]);
+pub const SYS_ID: Pubkey = Pubkey::const_new([0u8; 32]);
+pub const TOKEN_ID: Pubkey = Pubkey::const_new([1u8; 32]);
+pub const MINT_ID: Pubkey = Pubkey::const_new([2u8; 32]);
+
+// pub const PATH: &str = "src/configmap/sys.json";
+
+// fn start() {
+//     // let sys = Sys::create_sys_account();
+//     let sys = if let Some(sys) = Sys::from_file(PATH) {
+//         sys
+//     } else {
+//         if let Some(mut sys) = Sys::create_sys_account() {
+//             let owner = Pubkey::new_rand();
+//             sys.create_account(owner, vec![], 0, false, TOKEN_ID);
+//             sys.create_account(owner, vec![], 0, false, MINT_ID);
+//             let mint = Mint::genesis(1_000_000_000_000, owner, 2);
+//             let token = Token::genesis(mint.total_supply, owner, 2);
+//             sys.unwrap()
+//         }
+//     };
+// }
 
 
-
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ProgramAccount {
     pub lamports: u64,
     pub owner: Pubkey,
@@ -16,15 +41,30 @@ pub struct ProgramAccount {
     pub executable: bool,
 }
 
+// #[derive(Serialize, Deserialize)]
 pub struct Sys {
     pub current_block: Block,
-    pub block_hash: HashSet<Hash>,
+    // pub block_hash: HashSet<Hash>,
     pub program_accounts: HashMap<Pubkey, ProgramAccount>
 }
 
 impl Sys {
+    // pub fn to_file(&self, filepath: &str) -> io::Result<()> {
+    //     let mut file = File::create(filepath)?;
+    //     let serialized = serde_json::to_string(self)?;
+    //     file.write_all(serialized.as_bytes())?;
+    //     Ok(())
+    // }
+    //
+    // pub fn from_file(filepath: &str) -> io::Result<Sys> {
+    //     let file = File::open(filepath)?;
+    //     let reader = BufReader::new(file);
+    //     let sys: Sys = serde_json::from_reader(reader)?;
+    //     Ok(sys)
+    // }
+
     pub fn create_sys_account() -> Option<Sys> {
-        let sys_program_id = Pubkey::new_rand();
+        let sys_program_id = SYS_ID;
         let sys_owner = Pubkey::new_rand();
         let sys_account = ProgramAccount {
             lamports: 0,
@@ -38,7 +78,7 @@ impl Sys {
 
         let sys = Self {
             current_block: Block::default(),
-            block_hash: HashSet::new(),
+            // block_hash: HashSet::new(),
             program_accounts,
         };
 
@@ -51,9 +91,8 @@ impl Sys {
         data: Vec<u8>,
         lamports: u64,
         executable: bool,
+        program_id: Pubkey,
     ) -> Pubkey {
-        let program_id = Pubkey::new_rand();
-
         let program_account = ProgramAccount {
             lamports,
             owner,
@@ -99,16 +138,21 @@ impl Sys {
     }
 
     pub fn update_chain(&mut self, block: Block, blockchain: &mut Blockchain) {
-        self.block_hash.insert(block.hash.clone());
+        // self.block_hash.insert(block.hash.clone());
         self.current_block = block;
 
         blockchain.add_block(&mut self.current_block).expect("chain update failure");
     }
+
+    pub fn from_db(dbpath: String) -> Result<Option<Vec<u8>>, String> {
+        let mut dbhandler = DBHandler::new(0); // 여기의 0은 노드의 개수, 잠재적으로 진입할 최대 db의 개수
+        dbhandler.handle_request_get(dbpath, &SYS_ID.0)
+    }
 }
 
 pub fn create_essential_id(sys: &mut Sys, owner: Pubkey) -> (Pubkey, Pubkey) {
-    let token_id = sys.create_account(owner, vec![], 0, false);
-    let mint_id = sys.create_account(owner, vec![], 0, false);
+    let token_id = sys.create_account(owner, vec![], 0, false, TOKEN_ID);
+    let mint_id = sys.create_account(owner, vec![], 0, false, MINT_ID);
 
     (token_id, mint_id)
 }
