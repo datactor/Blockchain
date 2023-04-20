@@ -1,4 +1,4 @@
-use blockchainlib::app;
+use blockchainlib::{app, app2};
 use rocksdb::{DB, Options};
 
 fn main() {
@@ -17,6 +17,7 @@ fn main() {
     //     Err(e) => println!("operational problem encountered: {}", e),
     // }
 
+    app2::run();
 
     app::run();
 }

@@ -8,29 +8,30 @@ use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions
 use serde::{Serialize, Deserialize};
 
 use crate::block::Block;
-use crate::{Blockchain, Hash, Pubkey, Token, Account, Database, DBHandler, Mint, Signature};
+use crate::{Blockchain, Hash, Pubkey, Token, Account, Database, DBHandler, Mint, Signature, ProgramResult};
 
 pub const SYS_ID: Pubkey = Pubkey::const_new([0u8; 32]);
 pub const TOKEN_ID: Pubkey = Pubkey::const_new([1u8; 32]);
 pub const MINT_ID: Pubkey = Pubkey::const_new([2u8; 32]);
 
-// pub const PATH: &str = "src/configmap/sys.json";
+pub const PATH: &str = "src/configmap/sys.json";
 
-// fn start() {
-//     // let sys = Sys::create_sys_account();
-//     let sys = if let Some(sys) = Sys::from_file(PATH) {
-//         sys
-//     } else {
-//         if let Some(mut sys) = Sys::create_sys_account() {
-//             let owner = Pubkey::new_rand();
-//             sys.create_account(owner, vec![], 0, false, TOKEN_ID);
-//             sys.create_account(owner, vec![], 0, false, MINT_ID);
-//             let mint = Mint::genesis(1_000_000_000_000, owner, 2);
-//             let token = Token::genesis(mint.total_supply, owner, 2);
-//             sys.unwrap()
-//         }
-//     };
-// }
+pub fn start() -> ProgramResult {
+    // let sys = Sys::create_sys_account();
+    let sys = if let Ok(sys) = Sys::from_file(PATH) {
+        sys
+    } else {
+        let mut sys = Sys::create_sys_account().unwrap();
+        let owner = Pubkey::new_rand();
+        sys.create_account(owner, vec![], 0, false, TOKEN_ID);
+        sys.create_account(owner, vec![], 0, false, MINT_ID);
+        let mint = Mint::genesis(1_000_000_000_000, owner, 2);
+        let token = Token::genesis(mint.total_supply, owner, 2);
+        sys.to_file(PATH).expect("File creating failure");
+        sys
+    };
+    Ok(())
+}
 
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -44,7 +45,7 @@ pub struct ProgramAccount {
 #[derive(Serialize, Deserialize)]
 pub struct Sys {
     pub current_block: Block,
-    // pub block_hash: HashSet<Hash>,
+    // #[serde(with = "serde_with::rust::maps::HashMap<_, _>", rename = "program_accounts")]
     pub program_accounts: HashMap<Pubkey, ProgramAccount>
 }
 

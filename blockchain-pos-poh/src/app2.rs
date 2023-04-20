@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bs58::{decode, encode};
 use crate::programs::sys;
 
-fn run() -> ProgramResult {
+pub fn run() -> ProgramResult {
     start(sys::SYS_ID)?;
     start(token::ID)?;
     start(mint::ID)?;
@@ -13,7 +13,7 @@ fn run() -> ProgramResult {
 
 pub fn start(program_id: Pubkey) -> ProgramResult {
     match program_id {
-        // sys::ID => {},
+        sys::SYS_ID => sys::start(),
         // token::ID => {},
         // mint::ID => {},
         _ => Err(entrypoint::ProgramError::InvalidAccountData),
