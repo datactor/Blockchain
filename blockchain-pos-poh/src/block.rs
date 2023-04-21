@@ -26,6 +26,7 @@ pub struct Block {
     // votes: Hash,
 
     pub prev_block_hash: Hash,
+    // #[serde(with = "serde_with::rust::maps::HashMap<_, _>", rename = "rewards")]
     pub rewards: HashMap<Pubkey, u64>,
     is_confirmed: bool,
     pub(crate) hash: Hash,

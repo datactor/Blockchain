@@ -116,7 +116,7 @@ impl std::fmt::Debug for Privatekey {
 }
 
 
-#[derive(Eq, Hash, PartialEq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Serialize, Deserialize)]
 pub struct Pubkey(pub(crate) [u8; 32]);
 
 impl Pubkey {

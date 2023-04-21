@@ -34,7 +34,7 @@ pub fn start() -> ProgramResult {
 }
 
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ProgramAccount {
     pub lamports: u64,
     pub owner: Pubkey,
@@ -45,14 +45,21 @@ pub struct ProgramAccount {
 #[derive(Serialize, Deserialize)]
 pub struct Sys {
     pub current_block: Block,
-    // #[serde(with = "serde_with::rust::maps::HashMap<_, _>", rename = "program_accounts")]
     pub program_accounts: HashMap<Pubkey, ProgramAccount>
 }
 
 impl Sys {
     pub fn to_file(&self, filepath: &str) -> io::Result<()> {
         let mut file = File::create(filepath)?;
-        let serialized = serde_json::to_string(self)?;
+        let copied_program_accounts = &self.program_accounts;
+        let mut vec: Vec<(Pubkey, ProgramAccount)> = copied_program_accounts
+            .iter()
+            .map(|(pubkey, program_account)| (*pubkey, program_account.clone()))
+            .collect();
+
+        vec.sort();
+
+        let serialized = serde_json::to_string(&vec)?;
         file.write_all(serialized.as_bytes())?;
         Ok(())
     }
