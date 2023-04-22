@@ -35,6 +35,10 @@ pub fn run() {
     let encoded3 = EncodedPubkey("8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR".to_string());
     println!("decoded: {:?}", encoded3.to_pubkey().unwrap().0);
 
+    let deco = Pubkey::from(encoded3);
+    println!("{:?}", deco.0);
+
+
     ///////////
 
     login_menu_main(&mut accountset);

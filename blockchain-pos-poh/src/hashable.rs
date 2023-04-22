@@ -8,8 +8,8 @@ use ring::{
 };
 use bs58::{decode, encode};
 use ring::error::Unspecified;
-use serde::{Serialize, Deserialize};
-use serde_json::{Serializer, Deserializer};
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
+// use serde_json::{Serializer, Deserializer};
 
 // Digest of SHA256 is always 256bit [u8; 32].
 // if [u8; 128] as an input, wouldn't there be a conflict due to duplicate values?
@@ -116,8 +116,34 @@ impl std::fmt::Debug for Privatekey {
 }
 
 
-#[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
 pub struct Pubkey(pub(crate) [u8; 32]);
+
+impl Serialize for Pubkey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        let encoded = EncodedPubkey::from(*self);
+        encoded.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Pubkey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        let encoded = EncodedPubkey::deserialize(deserializer)?;
+        Ok(Pubkey::from(encoded))
+    }
+}
+
+impl From<EncodedPubkey> for Pubkey {
+    fn from(encoded_pubkey: EncodedPubkey) -> Pubkey {
+        Pubkey(bs58::decode(encoded_pubkey.0).into_vec().unwrap().try_into().unwrap())
+    }
+}
 
 impl Pubkey {
     pub const fn const_new(pubkey_bytes: [u8; 32]) -> Self {

@@ -47,7 +47,7 @@ pub struct ProgramAccount {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Sys {
     pub current_block: Block,
-    pub program_accounts: HashMap<EncodedPubkey, ProgramAccount>
+    pub program_accounts: HashMap<Pubkey, ProgramAccount>
 }
 
 
@@ -86,7 +86,7 @@ impl Sys {
         };
 
         let mut program_accounts = HashMap::new();
-        program_accounts.insert(EncodedPubkey::from(sys_program_id), sys_account);
+        program_accounts.insert(sys_program_id.clone(), sys_account);
 
         let sys = Self {
             current_block: Block::default(),
@@ -112,7 +112,7 @@ impl Sys {
             executable,
         };
 
-        self.program_accounts.insert(EncodedPubkey::from(program_id), program_account);
+        self.program_accounts.insert(program_id, program_account);
 
         program_id
     }
