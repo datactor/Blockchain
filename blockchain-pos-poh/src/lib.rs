@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use chrono::prelude::*;
 use ring::signature::{Ed25519KeyPair, UnparsedPublicKey, ED25519};
 use serde::{Serialize, Deserialize};
@@ -61,6 +62,36 @@ impl std::error::Error for SignatureError {}
 
 #[derive(Clone, Debug)]
 pub struct Signature(pub [u8; 64]);
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EncodedPubkey(pub String);
+
+impl From<Pubkey> for EncodedPubkey {
+    fn from(pubkey: Pubkey) -> EncodedPubkey {
+        EncodedPubkey(bs58::encode(pubkey.0).into_string())
+    }
+}
+
+impl EncodedPubkey {
+    pub fn to_pubkey(&self) -> Result<Pubkey, String> {
+        let decoded = bs58::decode(&self.0)
+            .into_vec()
+            .map_err(|e| format!("Error decoding EncodedPubkey: {}", e))?;
+        if decoded.len() != 32 {
+            return Err("Invalid length for decoded EncodedPubkey".to_string());
+        }
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(&decoded);
+        Ok(Pubkey(bytes))
+    }
+}
+
+impl std::fmt::Display for EncodedPubkey {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
 
 impl Serialize for Signature {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

@@ -19,6 +19,19 @@ pub fn run() {
 
     let mut accountset = AccountSet::new();
 
+
+    ///////////
+    let pubkey = Pubkey([0u8; 32]);
+
+    let encoded = EncodedPubkey::from(pubkey.clone());
+    println!("encoded: {}", encoded);
+
+    let pubkey2 = encoded.to_pubkey().unwrap();
+    println!("decoded: {:?}", pubkey2.0);
+
+
+    ///////////
+
     login_menu_main(&mut accountset);
 
     // 1. The validator requests the network to create a block.

@@ -6,6 +6,7 @@ use std::{
 };
 use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions, IteratorMode, DBWithThreadMode, SingleThreaded, Error};
 use serde::{Deserialize, Serialize};
+use bs58::{encode, decode};
 
 use crate::block::Block;
 use crate::{Blockchain, Hash, Pubkey, Token, Account, Database, DBHandler, Mint, Signature, ProgramResult};
@@ -62,8 +63,6 @@ impl Sys {
 
         vec.sort();
         let serialized = serde_json::to_string(&vec)?;
-
-        let serialized = serde_json::to_string(&has)?;
 
         file.write_all(serialized.as_bytes())?;
         Ok(())
