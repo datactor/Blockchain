@@ -63,7 +63,7 @@ impl std::error::Error for SignatureError {}
 #[derive(Clone, Debug)]
 pub struct Signature(pub [u8; 64]);
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct EncodedPubkey(pub String);
 
 impl From<Pubkey> for EncodedPubkey {

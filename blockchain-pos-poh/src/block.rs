@@ -40,11 +40,11 @@ pub struct Block {
 impl Debug for Block {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "Block[{}]: {} at: {} with: {}, total: {}",
-            &self.slot,
-            &hex::encode(&self.hash.0),
-            &self.timestamp,
-            &self.working_stake,
-            &self.total_stake,
+               &self.slot,
+               &hex::encode(&self.hash.0),
+               &self.timestamp,
+               &self.working_stake,
+               &self.total_stake,
         )
     }
 }

@@ -28,8 +28,8 @@ use super::*;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Transaction { // 서명된 집합. 네트워크에 브로드캐스트되는 명령의 수
-    pub signatures: Vec<Signature>, // Tx를 인증하는데 사용됨
-    pub sender: Pubkey,
+pub signatures: Vec<Signature>, // Tx를 인증하는데 사용됨
+pub sender: Pubkey,
     pub recipient: Pubkey,
     pub amount: u64,
     pub message: Message, // Msg는 실행 중인 명령을 지정함

@@ -29,6 +29,11 @@ pub fn run() {
     let pubkey2 = encoded.to_pubkey().unwrap();
     println!("decoded: {:?}", pubkey2.0);
 
+    let encoded2 = EncodedPubkey("4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi".to_string());
+    println!("decoded: {:?}", encoded2.to_pubkey().unwrap().0);
+
+    let encoded3 = EncodedPubkey("8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR".to_string());
+    println!("decoded: {:?}", encoded3.to_pubkey().unwrap().0);
 
     ///////////
 
@@ -181,4 +186,3 @@ pub fn validate_block() {
 pub fn update_blockcahin() {
     todo!();
 }
-

@@ -282,30 +282,30 @@ impl DBHandler {
         db.update(account_id, val)
     }
 }
-    // pub fn remove_path(&mut self, path: &str) {
-    //     self.shard_path.remove_path(path);
-    //     let shard_indexes = self.shard_path.get_shard_indexes_for_path(path);
-    //     if shard_indexes.contains(&self.get_shard_index(&[])) {
-    //         return;
-    //     }
-    //     let db_path = self.shard_path.get_path_for_shard_index(shard_indexes[0]);
-    //     let db = Arc::new(Mutex::new(Database::new(&db_path)));
-    //     self.inner = db;
-    // }
-    //
-    // pub fn move_shard(&mut self, _shard_index: usize, from_path: &str, to_path: &str) {
-    //     if from_path == to_path {
-    //         return;
-    //     }
-    //     let from_shard_index = self.shard_path.get_shard_indexes_for_path(from_path)[0];
-    //     let to_shard_index = self.shard_path.get_shard_indexes_for_path(to_path)[0];
-    //     if from_shard_index == to_shard_index {
-    //         return;
-    //     }
-    //     let db_path = self.shard_path.get_path_for_shard_index(to_shard_index);
-    //     let db = Arc::new(Mutex::new(Database::new(&db_path)));
-    //     self.inner = db;
-    // }
+// pub fn remove_path(&mut self, path: &str) {
+//     self.shard_path.remove_path(path);
+//     let shard_indexes = self.shard_path.get_shard_indexes_for_path(path);
+//     if shard_indexes.contains(&self.get_shard_index(&[])) {
+//         return;
+//     }
+//     let db_path = self.shard_path.get_path_for_shard_index(shard_indexes[0]);
+//     let db = Arc::new(Mutex::new(Database::new(&db_path)));
+//     self.inner = db;
+// }
+//
+// pub fn move_shard(&mut self, _shard_index: usize, from_path: &str, to_path: &str) {
+//     if from_path == to_path {
+//         return;
+//     }
+//     let from_shard_index = self.shard_path.get_shard_indexes_for_path(from_path)[0];
+//     let to_shard_index = self.shard_path.get_shard_indexes_for_path(to_path)[0];
+//     if from_shard_index == to_shard_index {
+//         return;
+//     }
+//     let db_path = self.shard_path.get_path_for_shard_index(to_shard_index);
+//     let db = Arc::new(Mutex::new(Database::new(&db_path)));
+//     self.inner = db;
+// }
 
 
 // Todo!(); // compatcion
