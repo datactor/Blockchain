@@ -5,7 +5,7 @@ use std::{
     collections::{HashMap, HashSet},
 };
 use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions, CompactOptions, IteratorMode, DBWithThreadMode, SingleThreaded, Error};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::block::Block;
 use crate::{Blockchain, Hash, Pubkey, Token, Account, Database, DBHandler, Mint, Signature, ProgramResult};
@@ -30,11 +30,12 @@ pub fn start() -> ProgramResult {
         sys.to_file(PATH).expect("File creating failure");
         sys
     };
+
     Ok(())
 }
 
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ProgramAccount {
     pub lamports: u64,
     pub owner: Pubkey,
@@ -42,24 +43,28 @@ pub struct ProgramAccount {
     pub executable: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Sys {
     pub current_block: Block,
     pub program_accounts: HashMap<Pubkey, ProgramAccount>
 }
 
+
 impl Sys {
     pub fn to_file(&self, filepath: &str) -> io::Result<()> {
         let mut file = File::create(filepath)?;
         let copied_program_accounts = &self.program_accounts;
+        // println!("{:?}", copied_program_accounts);
         let mut vec: Vec<(Pubkey, ProgramAccount)> = copied_program_accounts
             .iter()
             .map(|(pubkey, program_account)| (*pubkey, program_account.clone()))
             .collect();
 
         vec.sort();
-
         let serialized = serde_json::to_string(&vec)?;
+
+        let serialized = serde_json::to_string(&has)?;
+
         file.write_all(serialized.as_bytes())?;
         Ok(())
     }

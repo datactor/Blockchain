@@ -12,6 +12,7 @@ pub mod account;
 pub mod programs;
 pub mod configmap;
 pub mod repl;
+pub mod repl2;
 pub mod database;
 pub mod nodes;
 pub mod shardpath;
