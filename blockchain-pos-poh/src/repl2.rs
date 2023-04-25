@@ -141,7 +141,7 @@ fn create_new_wallet(accountset: &AccountSet) -> Result<Account, Error> {
         let input = input::<String>()?;
         match input.as_ref() {
             "y" => {
-                let new_account = Account::new(0, new_private.pubkey(), 0, vec![], false, Some(Signature(new_private.sign(&[0u8; 32]))));
+                let new_account = Account::new(0, new_private.pubkey(), 0, vec![], false);
                 // accountset.insert_account(new_private.pubkey(), new_account);
                 let path = "./db/accountDB";
                 let mut opts = Options::default();

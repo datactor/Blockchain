@@ -5,21 +5,22 @@ use std::collections::HashMap;
 pub struct Account {
     pub balance: u64,
     pub owner: Pubkey,
-    lamports: u64, // 0.000000001 sol
+    pub lamports: u64, // 0.000000001 sol
     data: Vec<u8>,
     executable: bool, // account에 실행 가능한 프로그램(e.g. samrt contract)이 포함되어 있는지 여부
-    signature: Option<Signature>,
+    // signature: Option<Signature>,
+    // rent_epoch: Epoch,
 }
 
 impl Account {
-    pub fn new(balance: u64, owner: Pubkey, lamports: u64, data: Vec<u8>, executable: bool, signature: Option<Signature>) -> Self {
+    pub fn new(balance: u64, owner: Pubkey, lamports: u64, data: Vec<u8>, executable: bool) -> Self {
         Account {
             balance,
             owner,
             lamports,
             data,
             executable,
-            signature,
+            // signature,
         }
     }
 }
@@ -65,11 +66,11 @@ impl Hashable for Account {
         } else {
             bytes.push(0x00);
         };
-        if let Some(signature) = &self.signature {
-            bytes.extend(signature.0);
-        } else {
-            bytes.push(0x00);
-        }
+        // if let Some(signature) = &self.signature {
+        //     bytes.extend(signature.0);
+        // } else {
+        //     bytes.push(0x00);
+        // }
 
         bytes
     }
