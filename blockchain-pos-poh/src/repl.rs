@@ -6,9 +6,11 @@ use std::{
     fmt::Debug,
     str::FromStr,
 };
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use bs58::{decode, encode};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use rand::{Rng, thread_rng, rngs::OsRng};
+use crate::nodes::bootstrap::bootstrap;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum Error {
@@ -38,6 +40,13 @@ impl std::fmt::Display for Error {
 pub fn login_menu_main(accountset: &mut AccountSet) {
     let args: Vec<String> = env::args().collect();
     let mut accountset = accountset;
+
+    // tokio::runtime::Runtime::new()
+    //     .unwrap()
+    //     .block_on(async {
+    //         let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12345);
+    //         bootstrap(12345, socket).await.expect("Boot failure");
+    //     });
 
     if args.len() > 1 {
         // Handle command line arguments if any

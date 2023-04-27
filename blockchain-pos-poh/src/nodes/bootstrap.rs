@@ -1,32 +1,19 @@
-use {
-    std::{
-        sync::Arc,
-        time::Duration,
-        net::SocketAddr,
-    },
-    crate::{Account, DBHandler, DBPool, Pubkey, ShardPath, RateLimiter},
+use std::{
+    sync::Arc,
+    time::Duration,
+    net::{self, SocketAddr},
 };
+use crate::{Account, DBHandler, DBPool, Pubkey, ShardPath, RateLimiter};
 
 use tokio::{
     net::TcpListener,
     sync::{mpsc, oneshot},
 };
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut args = std::env::args();
-    args.next(); // skip program name
-
-    // parse arguments
-    let port: u16 = args.next().expect("port must be specified").parse()?;
-    let node_addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
-    let boot_addr: SocketAddr = args
-        .next()
-        .expect("bootstrap node must be specified")
-        .parse()?;
-
+pub async fn bootstrap(port: u16, boot_addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
+    let node_addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
     let mut listener = TcpListener::bind(&node_addr).await?;
     let (new_peer_tx, mut new_peer_rx) = mpsc::unbounded_channel();
 
@@ -89,20 +76,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 struct Peer {}
 
 impl Peer {
-    fn new(stream: tokio::net::TcpStream) -> Self {
+    pub fn new(stream: tokio::net::TcpStream) -> Self {
         // initialize new peer from incoming stream
         Peer {}
     }
 
-    async fn connect(addr: std::net::SocketAddr) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn connect(addr: SocketAddr) -> Result<Self, Box<dyn std::error::Error>> {
         // connect to remote peer at address
         Ok(Peer {})
     }
 
-    async fn bootstrap(&self) -> Result<(String, Vec<SocketAddr>), Box<dyn std::error::Error>> {
+    pub async fn bootstrap(&self) -> Result<(String, Vec<SocketAddr>), Box<dyn std::error::Error>> {
         // send bootstrap request to peer and wait for response
         let shard_path = String::from("some shard path");
-        let peer_list = vec![SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)), 12345)];
+        let peer_list = vec![SocketAddr::new(net::IpAddr::V4(net::Ipv4Addr::new(127, 0, 0, 1)), 12345)];
         Ok((shard_path, peer_list))
     }
 }
