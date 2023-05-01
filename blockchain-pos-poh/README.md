@@ -680,3 +680,26 @@ sys 프로그램이나 token, mint 프로그램을 실행하는 관리자 노드
 이것은 공유 메모리가 아니라 프라이빗 정보이다. 그러므로 validator에서는 접근이 불가능하다. 그렇지만 프로그램을 관리하는 노드도 여러개가 있으며,
 여기서도 BFT의 원리에 따라 Tower bft를 수행하여 리더노드를 선출하고 fault tolerance를 부여하기 때문에
 프라이빗 로컬에 저장된 정보도 Arc<RwLock>으로 구현하여 데이터 일관성을 보장하고 데이터 레이싱을 방지해야한다.
+
+#### 5월 1일
+consistent hashing은 리밸런싱 될때, node가 실패하거나 사용할 수 없을 때(이 경우 이전에 해당 노드에서 제공한 키를 시스템의 다른 노드로 마이그레이션
+해야하므로 마이그레이션이 완료될 때까지 일시적인 불일치가 발생할 수 있음) 일시적인 불일치가 발생할 수 있다.
+이러한 weak consistency는 여러개의 replicas로 인해 strong consistency를 달성할 수 있다. 
+그렇지만 이는  quorum-based replication scheme를 사용하는 것으로, 이 접근 방식은 모든 복제본이 동기화된 상태로 유지되고
+모든 노드가 동일한 데이터 사본을 볼 수 있도록 하는 것이다.
+이 접근 방식에서 각 write operation은 commit된 것으로 간주되기 전에 quorum of replicas에서 ack된다.
+예를 들어 각 데이터 조각에 대해 3개의 replicas가 있는 경우 commit된 것으로 간주되기 전에 적어도
+2개의 복제본이 write operation을 ack해야 한다. 이렇게 하면 모든 복제본에 동일한 데이터 복사본이 있고 모든 replicas가 write operation 순서에
+동의하는지 확인할 수 있다. 그렇지만 이는 시스템의 replicas 또는 node 수가 증가함에 따라 복잡해진다. 여기서 consensus 알고리즘이 빛을 발한다.
+Paxos 또는 Raft와 같은 합의 알고리즘은 오류나 네트워크 파티션이 있는 경우에도 모든 복제본이 데이터의 현재 상태에 동의하는지 확인하는 더 간단한 방법을 제공한다.
+
+아래는 Raft의 예다.
+
+1. 시스템의 각 노드에는 indentifier 또는 IP주소를 기반으로 consistent hash ring의 위치가 할당된다. 
+2. 각 키에는 해시 값을 기반으로 consistent hash ring의 위치도 할당된다.
+3. client가 키를 읽거나 쓰려고 할 때 먼저 hash ring에서 키의 위치를 계산하고 해당 키에 대한 요청을 처리할 책임이 있는 노드를 결정한다.
+4. 그런 다음 client는 적절한 노드에 read/write 요청을 보낸다(일반적으로 leader node).
+5. 노드가 write 요청을 받으면 Raft를 사용하여 시스템의 다른 모든 노드에 write operation을 복제한다. Raft는 모든 노드가 write 작업
+   순서에 동의하고 모든 노드가 동일한 데이터 복사본을 갖도록 한다.
+6. 노드가 read 요청을 받으면 데이터의 local 복사본에서 데이터를 읽는다. 모든 노드가 동일한 데이터 복사본을 가지고 있기 때문에 모두 동일한 키에
+   대해 동일한 값을 반환한다.
