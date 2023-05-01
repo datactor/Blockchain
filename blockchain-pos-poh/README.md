@@ -703,3 +703,15 @@ Paxos 또는 Raft와 같은 합의 알고리즘은 오류나 네트워크 파티
    순서에 동의하고 모든 노드가 동일한 데이터 복사본을 갖도록 한다.
 6. 노드가 read 요청을 받으면 데이터의 local 복사본에서 데이터를 읽는다. 모든 노드가 동일한 데이터 복사본을 가지고 있기 때문에 모두 동일한 키에
    대해 동일한 값을 반환한다.
+
+그렇지만 솔라나에서는 PoH(network)와 Tower BFT(validator)를 사용하여,
+weak consistency인 jump consistent hashing에서 strong consistency를 달성하게 한다.
+이것을 위해 네트워크의 모든 노드가 블록체인의 현재 상태에 동의하는지 확인하는 역할을 하는 validator와
+PoH consensus를 포함한 기술 조합을 사용한다.
+
+PoH는 네트워크의 노드 간 low-latency communication에 최적화되어 있으며,
+합의를 달성하기 위한 빠르고 확장 가능한 메커니즘을 제공한다.
+PoH는 블록체인의 각 블록에 대해 검증 가능한 timestamp(slot)를 생성하여 노드가 체인의 트랜잭션 및 블록 순서를 빠르고 쉽게 확인할 수 있도록 한다.
+
+솔라나의 validator는 Tower BFT를 사용해 체인의 트랜잭션 및 블록 순서에 대한 합의를 달성하며,
+네트워크 전체에서 PoH를 사용해 블록체인의 시간 참조를 생성하여 합의를 달성한다.
