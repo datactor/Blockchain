@@ -46,7 +46,7 @@ pub fn login_menu_main() {
         .unwrap()
         .block_on(async {
             let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12345);
-            bootstrap(12345, socket).await.expect("Boot failure");
+            bootstrap(12345, socket, "").await.expect("Boot failure");
         });
 
 
