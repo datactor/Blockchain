@@ -5,20 +5,15 @@ use std::{
     collections::HashMap,
     fs,
 };
-
 use parking_lot::RwLock;
-
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
 use tokio::{
     net::TcpListener,
-    sync::{mpsc, oneshot},
+    sync::{mpsc, oneshot, RwLock as TokRwLock},
     time::timeout,
     io::{AsyncReadExt, AsyncWriteExt},
 };
-
 use serde_json;
-
 use crate::{Account, DBHandler, DBPool, Pubkey, ShardPath, RateLimiter, EncodedPubkey};
 
 const TIMEOUT_SEC: u64 = 5;
@@ -65,7 +60,7 @@ impl<'de> Deserialize<'de> for Cluster {
             nodes: HashMap<EncodedPubkey, Node>,
         }
 
-        let tmp: Tmp = serde::Deserialize::deserialize(deserializer)?;
+        let tmp: Tmp = Deserialize::deserialize(deserializer)?;
         let mut nodes: HashMap<EncodedPubkey, Arc<RwLock<Node>>> = HashMap::new();
         for (k, v) in tmp.nodes {
             nodes.insert(k, Arc::new(RwLock::new(v)));
@@ -153,12 +148,46 @@ impl Peer {
                 }
             } else if request.starts_with("SET_NODE") {
                 // Handle SET_NODE request
-                // ...
+                self.set_node(&request).await;
+
+                // Send a confirmation response to the client
+                let response = "SET_NODE request processed\n";
+                if let Err(e) = stream.write_all(response.as_bytes()).await {
+                    eprintln!("failed to write response to socket; err = {:?}", e);
+                    return;
+                }
             } else {
                 // Unknown request
-                // ...
+                let response = "Unknown request\n";
+                if let Err(e) = stream.write_all(response.as_bytes()).await {
+                    eprintln!("failed to write response to socket; err = {:?}", e);
+                    return;
+                }
             }
         }
+    }
+
+    async fn set_node(&self, request: &str) {
+        // Example request format: "SET_NODE <address> <key> <shard> <leader>"
+        let parts: Vec<&str> = request.split_whitespace().collect();
+
+        if parts.len() != 5 {
+            eprintln!("Invalid SET_NODE request format");
+            return;
+        }
+
+        let address = parts[1];
+        let key = parts[2];
+        let shard = parts[3];
+        let leader = parts[4].parse::<bool>().unwrap_or(false);
+
+        let mut node = self.node.write();
+        node.address = address.parse().unwrap();
+        node.key = key.to_string();
+        node.shard = shard.to_string();
+        node.leader = leader;
+
+        println!("Node information updated: {:?}", *node);
     }
 
     pub async fn connect(addr: SocketAddr, node: Arc<RwLock<Node>>) -> Result<Self, Box<dyn std::error::Error>> {
@@ -186,25 +215,10 @@ impl Peer {
 pub async fn bootstrap(port: u16, boot_addr: SocketAddr, cluster_json: &str) -> Result<(), Box<dyn std::error::Error>> {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
-    // let node_addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
-    // let mut listener = TcpListener::bind(&node_addr).await?;
     let (new_peer_tx, mut new_peer_rx) = mpsc::unbounded_channel();
 
     // Load the cluster info from JSON
     let cluster: Cluster = serde_json::from_str(cluster_json)?;
-
-    // // spawn task to accept incoming connections
-    // let new_peer_tx_clone = new_peer_tx.clone();
-    // let handler = tokio::spawn(async move {
-    //     while let Ok((stream, _addr)) = listener.accept().await {
-    //         let new_peer_tx = new_peer_tx_clone.clone();
-    //         let node = Arc::new(RwLock::new(Node::default()));
-    //         let peer = Peer::new(stream, node);
-    //         if new_peer_tx.send(Arc::new(peer)).is_err() {
-    //             return;
-    //         }
-    //     }
-    // });
 
     for node_id in cluster.nodes.keys() {
         // Find the corresponding node info
@@ -231,18 +245,34 @@ pub async fn bootstrap(port: u16, boot_addr: SocketAddr, cluster_json: &str) -> 
     let handler = tokio::spawn(async move {
         while let Some(peer) = new_peer_rx.recv().await {
             // Process the new peer by sending appropriate requests based on cluster information
-            let peer_node = Arc::clone(&peer.node);
+            let peer_clone = Arc::clone(&peer.node);
 
             // Send requests to the new peer based on node information
             // ...
 
-            // Example: Sending a GET_NODE request
+            // Sending a GET_NODE request
             let get_node_request = "GET_NODE".to_string();
             let mut buf = get_node_request.into_bytes();
             buf.resize(1024, 0); // Resize the buffer to a fixed size
-            // if let Err(e) = peer.write_all(&buf).await {
-            //     eprintln!("failed to send GET_NODE request to peer; err = {:?}", e);
-            // }
+
+            let peer_node_address = {
+                let peer_node = peer_clone.read();
+                println!("{}", peer_node.node_id);
+                peer_node.address
+            };
+
+            // let peer_node = peer.read();
+            let mut stream = match tokio::net::TcpStream::connect(peer_node_address).await {
+                Ok(stream) => stream,
+                Err(e) => {
+                    eprintln!("failed to connect to peer; err = {:?}", e);
+                    continue;
+                }
+            };
+
+            if let Err(e) = stream.write_all(&buf).await {
+                eprintln!("failed to send GET_NODE request to peer; err = {:?}", e);
+            }
         }
     });
 
