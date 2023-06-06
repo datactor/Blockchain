@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, hash_map::DefaultHasher},
+    collections::{HashMap, HashSet, hash_map::DefaultHasher, BTreeSet},
     fs,
     time::{Duration, Instant},
     path::Path,
@@ -124,38 +124,61 @@ impl ShardPath {
 #[derive(Clone)]
 pub struct ConsistentHashRing {
     nodes: HashMap<u64, String>,
-    sorted_keys: Vec<u64>,
+    // sorted_keys: Vec<u64>,
+    sorted_keys: BTreeSet<u64>,
 }
 
 impl ConsistentHashRing {
     pub fn new() -> Self {
         ConsistentHashRing {
             nodes: HashMap::new(),
-            sorted_keys: Vec::new(),
+            // sorted_keys: Vec::new(),
+            sorted_keys: BTreeSet::new(),
         }
     }
+
+    // pub fn add(&mut self, node_id: &str, replicas: usize) {
+    //     for i in 0..replicas {
+    //         let key = Self::hash(&(node_id.to_owned() + &i.to_string()));
+    //         self.nodes.insert(key, node_id.to_owned());
+    //         self.sorted_keys.push(key);
+    //     }
+    //     self.sorted_keys.sort();
+    // }
+
+    // pub fn remove(&mut self, node_id: &str) {
+    //     let mut remove_indices = Vec::new();
+    //     for (i, key) in self.sorted_keys.iter().enumerate() {
+    //         let node = self.nodes.get(&key).unwrap();
+    //         if node == node_id {
+    //             remove_indices.push(i);
+    //         }
+    //     }
+    //     for i in remove_indices.iter().rev() {
+    //         self.sorted_keys.remove(*i);
+    //     }
+    //     self.nodes.retain(|_, v| v != node_id);
+    // }
 
     pub fn add(&mut self, node_id: &str, replicas: usize) {
         for i in 0..replicas {
             let key = Self::hash(&(node_id.to_owned() + &i.to_string()));
             self.nodes.insert(key, node_id.to_owned());
-            self.sorted_keys.push(key);
+            self.sorted_keys.insert(key);
         }
-        self.sorted_keys.sort();
     }
 
     pub fn remove(&mut self, node_id: &str) {
-        let mut remove_indices = Vec::new();
-        for (i, key) in self.sorted_keys.iter().enumerate() {
-            let node = self.nodes.get(&key).unwrap();
-            if node == node_id {
-                remove_indices.push(i);
-            }
+        let keys_to_remove: Vec<_> = self.nodes
+            .iter()
+            .filter(|(_, v)| *v == node_id)
+            .map(|(k, _)| *k)
+            .collect();
+
+        for key in keys_to_remove {
+            self.nodes.remove(&key);
+            self.sorted_keys.remove(&key);
         }
-        for i in remove_indices.iter().rev() {
-            self.sorted_keys.remove(*i);
-        }
-        self.nodes.retain(|_, v| v != node_id);
     }
 
     pub fn get_node(&self, key: &str) -> Option<String> {
@@ -163,19 +186,29 @@ impl ConsistentHashRing {
             return None;
         }
         let hash = Self::hash(key);
-        let pos = match self.sorted_keys.binary_search(&hash) {
-            Ok(pos) => pos,
-            Err(pos) => {
-                if pos == self.sorted_keys.len() {
-                    0
-                } else {
-                    pos
-                }
-            }
-        };
-
-        self.nodes.get(&self.sorted_keys[pos]).map(|node| node.clone())
+        let &node_key = self.sorted_keys.range(hash..).next()
+            .unwrap_or_else(|| self.sorted_keys.iter().next().unwrap());
+        self.nodes.get(&node_key).map(|node| node.clone())
     }
+
+    // pub fn get_node(&self, key: &str) -> Option<String> {
+    //     if self.nodes.is_empty() {
+    //         return None;
+    //     }
+    //     let hash = Self::hash(key);
+    //     let pos = match self.sorted_keys.binary_search(&hash) {
+    //         Ok(pos) => pos,
+    //         Err(pos) => {
+    //             if pos == self.sorted_keys.len() {
+    //                 0
+    //             } else {
+    //                 pos
+    //             }
+    //         }
+    //     };
+    //
+    //     self.nodes.get(&self.sorted_keys[pos]).map(|node| node.clone())
+    // }
 
     fn hash(key: &str) -> u64 {
         let mut hasher = DefaultHasher::new();

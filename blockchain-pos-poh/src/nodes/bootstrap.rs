@@ -22,6 +22,7 @@ const TIMEOUT_SEC: u64 = 5;
 struct Cluster {
     name: String,
     nodes: HashMap<EncodedPubkey, Arc<RwLock<Node>>>,
+    leader: Option<EncodedPubkey>,
 }
 
 impl Serialize for Cluster {
@@ -33,6 +34,7 @@ impl Serialize for Cluster {
         struct Tmp<'a> {
             name: &'a str,
             nodes: HashMap<EncodedPubkey, Node>,
+            leader: &'a Option<EncodedPubkey>,
         }
 
         let mut hashmap: HashMap<EncodedPubkey, Node> = HashMap::new();
@@ -44,6 +46,7 @@ impl Serialize for Cluster {
         let new = Tmp {
             name: &self.name,
             nodes: hashmap,
+            leader: &self.leader,
         };
         new.serialize(serializer)
     }
@@ -58,6 +61,7 @@ impl<'de> Deserialize<'de> for Cluster {
         struct Tmp {
             name: String,
             nodes: HashMap<EncodedPubkey, Node>,
+            leader: Option<EncodedPubkey>,
         }
 
         let tmp: Tmp = Deserialize::deserialize(deserializer)?;
@@ -69,7 +73,23 @@ impl<'de> Deserialize<'de> for Cluster {
         Ok(Cluster {
             name: tmp.name,
             nodes,
+            leader: tmp.leader,
         })
+    }
+}
+
+impl Cluster {
+    pub fn set_leader(&mut self, leader_node_id: &EncodedPubkey) -> Result<(), &'static str> {
+        if self.nodes.contains_key(leader_node_id) {
+            self.leader = Some(leader_node_id.clone());
+            Ok(())
+        } else {
+            Err("The specified node is not in the cluster")
+        }
+    }
+
+    pub fn get_leader(&self) -> Option<Arc<RwLock<Node>>> {
+        self.leader.as_ref().and_then(|node_id| self.nodes.get(node_id).cloned())
     }
 }
 
@@ -213,23 +233,30 @@ impl Peer {
 }
 
 pub async fn bootstrap(port: u16, boot_addr: SocketAddr, cluster_json: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // 1. Set shutdown channel
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
+    // 2. Set peer channel
     let (new_peer_tx, mut new_peer_rx) = mpsc::unbounded_channel();
 
-    // Load the cluster info from JSON
+    // 3. Load the cluster info from JSON
     let cluster: Cluster = serde_json::from_str(cluster_json)?;
 
+    let arc_new_peer_tx = Arc::new(new_peer_tx);
+
+    // 4. Attempting to connect to each nodes
     for node_id in cluster.nodes.keys() {
         // Find the corresponding node info
         let node = Arc::clone(cluster.nodes.get(&node_id).unwrap());
 
-        let new_peer_tx = new_peer_tx.clone();
-        let boot_addr = node.read().address;
+        let new_peer_tx_clone = Arc::clone(&arc_new_peer_tx);
+        // Use boot_addr as initial address for connection
+        // Centralized operation to validated and terminated by Bootstrap
+        // let boot_addr = node.read().address;
         tokio::spawn(async move {
             match Peer::connect(boot_addr, node).await {
                 Ok(peer) => {
-                    if new_peer_tx.send(Arc::new(peer)).is_err() {
+                    if new_peer_tx_clone.send(Arc::new(peer)).is_err() {
                         // channel was closed, shutdown
                         return;
                     }
@@ -241,14 +268,33 @@ pub async fn bootstrap(port: u16, boot_addr: SocketAddr, cluster_json: &str) -> 
         });
     }
 
+    // Start a TCP listener for incoming connections
+    let listener = TcpListener::bind(("0.0.0.0", port)).await?;
+
+    // Spawn a task to handle incoming connections
+    // let new_peer_tx_clone = new_peer_tx.clone();
+    tokio::spawn(async move {
+        loop {
+            let (stream, addr) = listener.accept().await.unwrap();
+            let new_peer_tx_clone = Arc::clone(&arc_new_peer_tx);
+
+            tokio::spawn(async move {
+                let node = Node::default(); // Create a default node
+                let node = Arc::new(RwLock::new(node));
+                let peer = Peer::new(stream, node);
+                if new_peer_tx_clone.send(Arc::new(peer)).is_err() {
+                    // channel was closed, shutdown
+                    return;
+                }
+            });
+        }
+    });
+
     // spawn task to handle new peers
     let handler = tokio::spawn(async move {
         while let Some(peer) = new_peer_rx.recv().await {
             // Process the new peer by sending appropriate requests based on cluster information
             let peer_clone = Arc::clone(&peer.node);
-
-            // Send requests to the new peer based on node information
-            // ...
 
             // Sending a GET_NODE request
             let get_node_request = "GET_NODE".to_string();
